@@ -46,7 +46,9 @@ CREATE TABLE SEDES (
 -- 4. USUARIOS (TRABAJADORES)
 CREATE TABLE USUARIOS (
     idUsuario INT AUTO_INCREMENT PRIMARY KEY,
-    usuario VARCHAR(100) NOT NULL UNIQUE,
+    nombres VARCHAR(150) NOT NULL,
+    apePaterno VARCHAR(100) NOT NULL,
+    apeMaterno VARCHAR(100) NOT NULL,
     correo VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
     rol ENUM('ADMINISTRADOR', 'SUPERVISOR', 'VENDEDOR') NOT NULL,
@@ -82,7 +84,9 @@ CREATE TABLE PUNTOS_VENTA (
     latitud DECIMAL(10, 8) NOT NULL,
     longitud DECIMAL(11, 8) NOT NULL,
     idDistrito INT NOT NULL,
-    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito)
+    idUsuario INT NOT NULL, -- Agregado para coincidir con la relación USUARIOSidUsuario del diagrama
+    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
 
 -- 7. PROSPECTOS (EXPANSIÓN)
@@ -169,4 +173,25 @@ CREATE TABLE EVIDENCIAS (
     INCIDENCIASidIncidencias INT,
     FOREIGN KEY (idStock) REFERENCES STOCK_REGISTROS(idStock),
     FOREIGN KEY (INCIDENCIASidIncidencias) REFERENCES INCIDENCIAS(idIncidencias)
+);
+
+-- 13. VENTAS (NUEVA TABLA)
+CREATE TABLE VENTAS (
+    idVenta INT AUTO_INCREMENT PRIMARY KEY,
+    fecha DATE NOT NULL,
+    hora TIME NOT NULL,
+    total DECIMAL(10, 2) NOT NULL,
+    idUsuario INT NOT NULL,
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
+);
+
+-- 14. DETALLE_VENTA (NUEVA TABLA INTERMEDIA)
+CREATE TABLE DETALLE_VENTA (
+    idVenta INT NOT NULL,
+    idProductos INT NOT NULL,
+    precio DECIMAL(10, 2) NOT NULL,
+    cantidad INT NOT NULL,
+    PRIMARY KEY (idVenta, idProductos),
+    FOREIGN KEY (idVenta) REFERENCES VENTAS(idVenta),
+    FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos)
 );
