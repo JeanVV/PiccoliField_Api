@@ -11,8 +11,8 @@ class Config:
     MYSQL_PORT = int(os.getenv("MYSQL_PORT", "3306"))
     MYSQL_USER = os.getenv("MYSQL_USER", "root")
     MYSQL_PASSWORD = os.getenv("MYSQL_PASSWORD", "")
-    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "campusgo")
-    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "campusgo-clave-secreta-cambiar")
+    MYSQL_DATABASE = os.getenv("MYSQL_DATABASE", "piccoliField")
+    JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "@piccoliField26")
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=2)
 
     PROFILE_PHOTO_DIR = os.getenv(

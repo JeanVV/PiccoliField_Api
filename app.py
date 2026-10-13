@@ -11,7 +11,6 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
-    # JSON personalizado
     app.json = CustomJSONProvider(app)
 
     JWTManager(app)
