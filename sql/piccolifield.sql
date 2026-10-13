@@ -1,0 +1,172 @@
+DROP DATABASE IF EXISTS piccoliField_db;
+CREATE DATABASE piccoliField_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE piccoliField_db;
+
+-- 1. ESTRUCTURA GEOGRÁFICA
+CREATE TABLE DEPARTAMENTO (
+    idDepartamento INT AUTO_INCREMENT PRIMARY KEY,
+    departamento VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE PROVINCIA (
+    idProvincia INT AUTO_INCREMENT PRIMARY KEY,
+    provincia VARCHAR(100) NOT NULL,
+    idDepartamento INT NOT NULL,
+    FOREIGN KEY (idDepartamento) REFERENCES DEPARTAMENTO(idDepartamento)
+);
+
+CREATE TABLE DISTRITO (
+    idDistrito INT AUTO_INCREMENT PRIMARY KEY,
+    distrito VARCHAR(100) NOT NULL,
+    idProvincia INT NOT NULL,
+    FOREIGN KEY (idProvincia) REFERENCES PROVINCIA(idProvincia)
+);
+
+-- 2. CATÁLOGO DE PRODUCTOS
+CREATE TABLE PRODUCTOS (
+    idProductos INT AUTO_INCREMENT PRIMARY KEY,
+    sku VARCHAR(50) NOT NULL UNIQUE,
+    codigo_ean VARCHAR(50) UNIQUE,
+    producto VARCHAR(150) NOT NULL,
+    categoria VARCHAR(100) NOT NULL,
+    presentacion VARCHAR(100),
+    estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO'
+);
+
+-- 3. SEDES DE LA EMPRESA
+CREATE TABLE SEDES (
+    idSede INT AUTO_INCREMENT PRIMARY KEY,
+    sede VARCHAR(150) NOT NULL,
+    direccion VARCHAR(255) NOT NULL,
+    codHuellero VARCHAR(50) UNIQUE,
+    idDistrito INT NOT NULL,
+    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito)
+);
+
+-- 4. USUARIOS (TRABAJADORES)
+CREATE TABLE USUARIOS (
+    idUsuario INT AUTO_INCREMENT PRIMARY KEY,
+    usuario VARCHAR(100) NOT NULL UNIQUE,
+    correo VARCHAR(150) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    rol ENUM('ADMINISTRADOR', 'SUPERVISOR', 'VENDEDOR') NOT NULL,
+    fcm_token VARCHAR(255),
+    id_dispositivo VARCHAR(100),
+    estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
+    idDistrito INT NOT NULL,
+    idSede INT NOT NULL,
+    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),
+    FOREIGN KEY (idSede) REFERENCES SEDES(idSede)
+);
+
+-- 5. ASISTENCIAS
+CREATE TABLE ASISTENCIAS (
+    idAsistencias INT AUTO_INCREMENT PRIMARY KEY,
+    id_turno VARCHAR(50) NOT NULL,
+    tipo ENUM('INGRESO', 'SALIDA') NOT NULL,
+    fecha_hora_servidor DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_hora_dispositivo DATETIME NOT NULL,
+    estado ENUM('A_TIEMPO', 'TARDANZA', 'FALTA') NOT NULL DEFAULT 'A_TIEMPO',
+    minutos_tardanza INT DEFAULT 0,
+    idUsuario INT NOT NULL,
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
+);
+
+-- 6. PUNTOS DE VENTA (IMPACTO)
+CREATE TABLE PUNTOS_VENTA (
+    idPuntosVenta INT AUTO_INCREMENT PRIMARY KEY,
+    codigo VARCHAR(50) NOT NULL UNIQUE,
+    puntosVenta VARCHAR(150) NOT NULL,
+    direccion VARCHAR(255) NOT NULL,
+    estado ENUM('ACTIVO', 'INACTIVO', 'CLAUSURADO') NOT NULL DEFAULT 'ACTIVO',
+    latitud DECIMAL(10, 8) NOT NULL,
+    longitud DECIMAL(11, 8) NOT NULL,
+    idDistrito INT NOT NULL,
+    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito)
+);
+
+-- 7. PROSPECTOS (EXPANSIÓN)
+CREATE TABLE PROSPECTOS (
+    idProspectos INT AUTO_INCREMENT PRIMARY KEY,
+    nombre_comercial VARCHAR(150) NOT NULL,
+    tipo_local VARCHAR(100),
+    direccion VARCHAR(255) NOT NULL,
+    contacto VARCHAR(150),
+    telefono VARCHAR(20),
+    potencial ENUM('ALTO', 'MEDIO', 'BAJO') NOT NULL DEFAULT 'MEDIO',
+    estado ENUM('NUEVO', 'EN_NEGOCIACION', 'CONVERTIDO', 'DESCARTADO') NOT NULL DEFAULT 'NUEVO',
+    latitud DECIMAL(10, 8) NOT NULL,
+    longitud DECIMAL(11, 8) NOT NULL,
+    idUsuario INT NOT NULL,
+    idDistrito INT NOT NULL,
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario),
+    FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito)
+);
+
+-- 8. INCIDENCIAS
+CREATE TABLE INCIDENCIAS (
+    idIncidencias INT AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(100) NOT NULL,
+    severidad ENUM('ALTA', 'MEDIA', 'BAJA') NOT NULL DEFAULT 'MEDIA',
+    descripcion TEXT NOT NULL,
+    estado ENUM('ABIERTO', 'EN_PROCESO', 'RESUELTO') NOT NULL DEFAULT 'ABIERTO',
+    fecha_registro DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    idUsuario INT NOT NULL,
+    idPuntosVenta INT NOT NULL,
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario),
+    FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta)
+);
+
+-- 9. ALERTAS DE STOCK
+CREATE TABLE ALERTAS_STOCK (
+    idAlertas INT AUTO_INCREMENT PRIMARY KEY,
+    tipo VARCHAR(100) NOT NULL,
+    estado ENUM('PENDIENTE', 'ATENDIDA', 'IGNORADA') NOT NULL DEFAULT 'PENDIENTE',
+    comentario TEXT,
+    fecha_atencion DATETIME,
+    idProductos INT NOT NULL,
+    idPuntosVenta INT NOT NULL,
+    FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos),
+    FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta)
+);
+
+-- 10. PEDIDO (RENDIMIENTO)
+CREATE TABLE Pedido (
+    idPedido INT AUTO_INCREMENT PRIMARY KEY,
+    cantSolicitada INT NOT NULL,
+    fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    idPuntosVenta INT NOT NULL,
+    idProductos INT NOT NULL,
+    FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta),
+    FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos)
+);
+
+-- 11. REGISTROS DE STOCK
+CREATE TABLE STOCK_REGISTROS (
+    idStock INT AUTO_INCREMENT PRIMARY KEY,
+    cant_exhibida INT NOT NULL DEFAULT 0,
+    cant_almacen INT NOT NULL DEFAULT 0,
+    estado_stock ENUM('OPTIMO', 'BAJO', 'AGOTADO') NOT NULL,
+    observacion TEXT,
+    fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    stock_minimo INT NOT NULL,
+    idPuntosVenta INT NOT NULL,
+    idProductos INT NOT NULL,
+    PedidoidPedido INT, 
+    FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta),
+    FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos),
+    FOREIGN KEY (PedidoidPedido) REFERENCES Pedido(idPedido)
+);
+
+-- 12. EVIDENCIAS FOTOGRÁFICAS
+CREATE TABLE EVIDENCIAS (
+    idEvidencias INT AUTO_INCREMENT PRIMARY KEY,
+    ruta_archivo VARCHAR(255) NOT NULL,
+    hash_sha VARCHAR(64) NOT NULL,
+    tipo VARCHAR(50) NOT NULL,
+    fecha_captura DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    idStock INT,
+    INCIDENCIASidIncidencias INT,
+    FOREIGN KEY (idStock) REFERENCES STOCK_REGISTROS(idStock),
+    FOREIGN KEY (INCIDENCIASidIncidencias) REFERENCES INCIDENCIAS(idIncidencias)
+);
