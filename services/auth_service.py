@@ -23,14 +23,16 @@ class AuthService:
             if usuario["password_hash"] != password_hash:
                 return None, "Correo o contraseña incorrectos", 401
 
-            token = create_access_token(identity=str(usuario["id"]))
+            token = create_access_token(identity=str(usuario["idUsuario"]))
 
             data = {
                 "token": token,
                 "usuario": {
-                    "id": usuario["id"],
+                    "idUsuario": usuario["idUsuario"],
+                    "nombres": usuario["nombres"],
+                    "apePaterno": usuario["apePaterno"],
+                    "apeMaterno": usuario["apeMaterno"],
                     "correo": usuario["correo"],
-                    "usuario": usuario["usuario"],
                     "rol": usuario["rol"]
                 }
             }

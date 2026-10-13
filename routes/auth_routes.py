@@ -8,16 +8,16 @@ auth_bp = Blueprint("auth", __name__)
 
 @auth_bp.route("/api/auth/login", methods=["POST"])
 def login():
-    body = request.get_json(silent=True)
+    datos = request.get_json(silent=True)
 
-    if not body:
-        return error_response("El cuerpo de la solicitud es requerido", 400)
+    if datos is None:
+        return error_response("Debe enviar los datos en formato JSON", 400)
 
-    correo = body.get("correo", "").strip()
-    password = body.get("password", "").strip()
+    correo = str(datos.get("correo", "")).strip()
+    password = str(datos.get("password", ""))
 
     if not correo or not password:
-        return error_response("Correo y contraseña son requeridos", 400)
+        return error_response("Correo y password son obligatorios", 400)
 
     service = AuthService()
     data, message, http_code = service.login(correo, password)
