@@ -1,37 +1,70 @@
 from repositories.asistencia_repository import AsistenciaRepository
-from datetime import datetime
 
 class AsistenciaService:
     def __init__(self):
         self.repository = AsistenciaRepository()
-    
-    def obtener_resumen_hoy(self):
-        hoy = datetime.now().date()
-        total = self.repository.contar_asistencias_hoy(hoy)
-        a_tiempo = self.repository.contar_por_estado(hoy, 'A_TIEMPO')
-        tardanzas = self.repository.contar_por_estado(hoy, 'TARDANZA')
-        presentes = a_tiempo + tardanzas
-        porcentaje = (presentes * 100 // total) if total > 0 else 0
-        
+
+    def obtener_resumen(self):
+        datos = self.repository.get_resumen()
+        total = datos.get('total', 0)
+        presentes = datos.get('presentes', 0)
+        porcentaje = round((presentes / total * 100)) if total > 0 else 0
+
         return {
-            'porcentaje': porcentaje,
-            'presentes': presentes,
-            'total': total,
-            'aTiempo': a_tiempo,
-            'tardanzas': tardanzas
+            "success": True,
+            "message": "Resumen obtenido correctamente",
+            "data": {
+                "porcentaje": porcentaje,
+                "presentes": presentes,
+                "total": total,
+                "aTiempo": datos.get('aTiempo', 0),
+                "tardanzas": datos.get('tardanzas', 0)
+            }
         }
-    
-    def obtener_ultimas_asistencias(self, limite=10):
-        return self.repository.obtener_ultimas(limite)
-    
-    def obtener_colaboradores_con_asistencia(self):
-        return self.repository.obtener_colaboradores_con_ultimo_registro()
-    
-    def obtener_detalle_usuario(self, id_usuario):
-        return self.repository.obtener_detalle_usuario(id_usuario)
-    
-    def obtener_historial_turnos(self, id_usuario):
-        return self.repository.obtener_historial_turnos(id_usuario)
-    
-    def obtener_evidencias_asistencia(self, id_asistencia):
-        return self.repository.obtener_evidencias(id_asistencia)
+
+    def obtener_recientes(self, limite):
+        datos = self.repository.get_recientes(limite)
+        return {
+            "success": True,
+            "message": "Asistencias recientes obtenidas",
+            "data": datos
+        }
+
+    def obtener_colaboradores(self):
+        datos = self.repository.get_colaboradores()
+        return {
+            "success": True,
+            "message": "Colaboradores obtenidos correctamente",
+            "data": datos
+        }
+
+    def obtener_detalle(self, id_usuario):
+        datos = self.repository.get_detalle_usuario(id_usuario)
+        if not datos:
+            return {
+                "success": False,
+                "message": "No se encontró asistencia de hoy para este usuario",
+                "data": None
+            }
+            
+        return {
+            "success": True,
+            "message": "Detalle obtenido correctamente",
+            "data": datos
+        }
+
+    def obtener_historial(self, id_usuario):
+        datos = self.repository.get_historial(id_usuario)
+        return {
+            "success": True,
+            "message": "Historial obtenido correctamente",
+            "data": datos
+        }
+
+    def obtener_evidencias(self, id_asistencia):
+        datos = self.repository.get_evidencias(id_asistencia)
+        return {
+            "success": True,
+            "message": "Evidencias obtenidas correctamente",
+            "data": datos
+        }
