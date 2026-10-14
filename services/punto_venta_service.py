@@ -91,7 +91,7 @@ class PuntoVentaService:
             connection.close()
 
     def cambiar_estado(self, idPuntosVenta, estado):
-        if estado not in ["OK", "BAJO", "QUIEBRE"]:
+        if estado not in ["ACTIVO", "INACTIVO", "CLAUSURADO"]:
             return None, "Estado no válido. Debe ser ACTIVO, INACTIVO o CLAUSURADO", 400
 
         connection = get_connection()
