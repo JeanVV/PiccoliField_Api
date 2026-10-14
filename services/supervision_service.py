@@ -61,3 +61,57 @@ class SupervisionService:
             return None, "Error interno", 500
         finally:
             connection.close()
+
+    def listar_puntos_venta(self):
+        try:
+            query = """
+                SELECT 
+                    idPuntosVenta AS id, 
+                    puntosVenta AS nombre, 
+                    direccion, 
+                    estado 
+                FROM PUNTOS_VENTA
+                ORDER BY puntosVenta ASC
+            """
+
+            data = []
+            for row in resultados:
+                data.append({
+                    "id": row['id'],
+                    "nombre": row['nombre'],
+                    "direccion": row['direccion'],
+                    "estado": row['estado']
+                })
+                
+            return data, "Puntos de venta obtenidos exitosamente", 200
+        except Exception as e:
+            return None, str(e), 500
+
+    def listar_alertas(self):
+        try:
+            query = """
+                SELECT 
+                    a.idAlertas AS idAlerta,
+                    a.estado AS estado_resolucion,
+                    a.tipo AS nivel_alerta,
+                    pv.puntosVenta AS local_nombre,
+                    p.producto AS nombre_producto
+                FROM ALERTAS_STOCK a
+                INNER JOIN PUNTOS_VENTA pv ON a.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN PRODUCTOS p ON a.idProductos = p.idProductos
+                ORDER BY a.idAlertas DESC
+            """
+            
+            data = []
+            for row in resultados:
+                data.append({
+                    "idAlerta": row['idAlerta'],
+                    "estado_resolucion": row['estado_resolucion'],
+                    "nivel_alerta": row['nivel_alerta'],
+                    "local_nombre": row['local_nombre'],
+                    "nombre_producto": row['nombre_producto']
+                })
+                
+            return data, "Alertas obtenidas exitosamente", 200
+        except Exception as e:
+            return None, str(e), 500

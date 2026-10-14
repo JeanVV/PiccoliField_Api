@@ -12,6 +12,7 @@ class SupervisionRepository:
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
                     pdv.puntosVenta AS local, 
                     SUM(dv.cantidad) AS cantidadVendida
+                    u.meta_mensual AS meta_asignada
                 FROM USUARIOS u
                 INNER JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
