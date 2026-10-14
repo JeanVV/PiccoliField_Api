@@ -1,3 +1,4 @@
+from MySQLdb import connections
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository
 
@@ -82,4 +83,17 @@ class AsistenciaService:
             evidencias = repository.get_evidencias(idAsistencia)
             return evidencias, "Evidencias obtenidas correctamente", 200
         finally:
+            connection.close()  
+
+    def marcarAsistenciaPersonal(self, idUsuario, Tipo): 
+        connection = get_connection()
+        try: 
+            repository = AsistenciaRepository(connection)  
+            if repository.verificarHorarioTurnoPersonal(idUsuario) == True:
+                return None, "Usuario no tiene horario de turno", 404
+            
+            repository.marcarAsistenciaPersonal(idUsuario, Tipo) 
+            asistencia = repository.asistenciaPersonal(idUsuario, Tipo)
+            return asistencia, "Asistencia marcada correctamente", 202
+        finally: 
             connection.close()

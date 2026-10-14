@@ -22,6 +22,8 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+    
+
     def get_recientes(self, limite):
         cursor = self.connection.cursor()
         try:
@@ -144,3 +146,55 @@ class AsistenciaRepository:
             return cursor.fetchall()
         finally:
             cursor.close()
+
+    def marcarAsistenciaPersonal(self, idUsuario, tipo):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                INSERT INTO ASISTENCIAS 
+                    (id_turno, tipo, fecha_hora_dispositivo, fecha_hora_servidor, idUsuario)
+                VALUES 
+                    (%s, %s, NOW(), NOW(), %s)
+            """
+            cursor.execute(sql, (idUsuario, tipo, idUsuario))
+            self.connection.commit()
+            return cursor.lastrowid
+        finally:
+            cursor.close()
+    
+    def verificarHorarioTurnoPersonal(self, idUsuario):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    t.horaEntrada,
+                    t.horaSalida
+                FROM USUARIOS u
+                INNER JOIN TURNOS t ON u.idTurno = t.idTurno
+                WHERE u.idUsuario = %s
+            """
+            cursor.execute(sql, (idUsuario,))
+            return cursor.fetchone()
+        finally:
+            cursor.close() 
+
+    def asistenciaPersonal(self, idUsuario, tipo):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    a.fecha_hora_servidor as fecha,
+                    a.fecha_hora_dispositivo as hora,
+                    a.minutos_tardanza,
+                    a.tipo,
+                    a.idUsuario
+                FROM USUARIOS u
+                INNER JOIN TURNOS t ON u.idTurno = t.idTurno
+                inner Join ASISTENCIAS a ON u.idUsuario = a.idUsuario
+                WHERE u.idUsuario = %s
+            """
+            cursor.execute(sql, (idUsuario,))
+            return cursor.fetchone()
+        finally:
+            cursor.close() 
+    

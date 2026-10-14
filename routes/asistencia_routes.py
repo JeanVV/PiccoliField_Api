@@ -77,5 +77,18 @@ def obtener_evidencias(idAsistencia):
 
     if data is None:
         return error_response(message, http_code)
+ 
+    return success_response(data, message, http_code)
 
+
+@asistencia_bp.route("api/asistencias/asistenciaPersonal/", methods = ["POST"])
+@jwt_required()
+def marcar_asistenciaPersonal():
+    data = request.get_json()
+    idUsuario = data.get("idUsuario")
+    tipo = data.get("tipo")
+    service = AsistenciaService()
+    data, message, http_code = service.marcarAsistenciaPersonal(idUsuario, tipo)
+    if data is None:
+        return error_response(message, http_code)
     return success_response(data, message, http_code)
