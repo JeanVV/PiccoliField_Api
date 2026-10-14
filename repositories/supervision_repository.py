@@ -11,14 +11,14 @@ class SupervisionRepository:
                     u.idUsuario,
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
                     pdv.puntosVenta AS local, 
-                    SUM(dv.cantidad) AS cantidadVendida
+                    SUM(dv.cantidad) AS cantidadVendida,
                     u.meta_mensual AS meta_asignada
                 FROM USUARIOS u
                 INNER JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
                 LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario
                 WHERE u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
-                GROUP BY u.idUsuario, u.nombres, u.apePaterno, pdv.puntosVenta -- ¡Aquí se agregó la columna!
+                GROUP BY u.idUsuario, u.nombres, u.apePaterno, pdv.puntosVenta,u.meta_mensual
                 ORDER BY cantidadVendida DESC;
             """
             cursor.execute(sql)
