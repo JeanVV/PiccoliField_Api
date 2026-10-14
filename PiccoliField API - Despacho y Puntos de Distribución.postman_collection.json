@@ -36,14 +36,10 @@
             {
               "listen": "test",
               "script": {
+                "type": "text/javascript",
                 "exec": [
-                  "var jsonData = pm.response.json();",
-                  "if (jsonData.data && jsonData.data.token) {",
-                  "    pm.collectionVariables.set('token', jsonData.data.token);",
-                  "    console.log('Token guardado automáticamente en la colección');",
-                  "}"
-                ],
-                "type": "text/javascript"
+                  "var jsonData = pm.response.json();\nif (jsonData.data && jsonData.data.token) {\n    pm.collectionVariables.set('token', jsonData.data.token);\n    console.log('Token guardado automáticamente en la colección');\n}"
+                ]
               }
             }
           ],
@@ -60,7 +56,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"correo\": \"admin@piccoli.pe\",\n    \"password\": \"admin\"\n}"
+              "raw": "{\n    \"correo\": \"admin@piccoli.pe\",\n    \"password\": \"hash_12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/auth/login",
