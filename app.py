@@ -2,7 +2,7 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from config import Config
 from utils.json_provider import CustomJSONProvider
-
+from routes.asistencia_routes import asistencia_bp
 from routes.auth_routes import auth_bp
 from routes.usuario_routes import usuario_bp
 
@@ -17,6 +17,7 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(usuario_bp)
+    app.register_blueprint(asistencia_bp)
 
     @app.get("/")
     def inicio():
