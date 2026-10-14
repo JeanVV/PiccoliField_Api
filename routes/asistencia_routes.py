@@ -1,54 +1,81 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, request
+from flask_jwt_extended import jwt_required
+
 from services.asistencia_service import AsistenciaService
+from utils.response import error_response, success_response
 
-asistencia_bp = Blueprint('asistencia', __name__, url_prefix='/api/asistencias')
-asistencia_service = AsistenciaService()
+asistencia_bp = Blueprint("asistencias", __name__)
 
-@asistencia_bp.route('/resumen', methods=['GET'])
+
+@asistencia_bp.route("/api/asistencias/resumen", methods=["GET"])
+@jwt_required()
 def obtener_resumen():
-    try:
-        resumen = asistencia_service.obtener_resumen_hoy()
-        return jsonify({'success': True, 'data': resumen}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_resumen()
 
-@asistencia_bp.route('/recientes', methods=['GET'])
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+
+
+@asistencia_bp.route("/api/asistencias/recientes", methods=["GET"])
+@jwt_required()
 def obtener_recientes():
-    try:
-        limite = request.args.get('limite', 10, type=int)
-        recientes = asistencia_service.obtener_ultimas_asistencias(limite)
-        return jsonify({'success': True, 'data': recientes}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    limite = request.args.get("limite", default=10, type=int)
 
-@asistencia_bp.route('/colaboradores', methods=['GET'])
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_recientes(limite=limite)
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+
+
+@asistencia_bp.route("/api/asistencias/colaboradores", methods=["GET"])
+@jwt_required()
 def obtener_colaboradores():
-    try:
-        colaboradores = asistencia_service.obtener_colaboradores_con_asistencia()
-        return jsonify({'success': True, 'data': colaboradores}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_colaboradores()
 
-@asistencia_bp.route('/detalle/<int:id_usuario>', methods=['GET'])
-def obtener_detalle(id_usuario):
-    try:
-        detalle = asistencia_service.obtener_detalle_usuario(id_usuario)
-        return jsonify({'success': True, 'data': detalle}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    if data is None:
+        return error_response(message, http_code)
 
-@asistencia_bp.route('/historial/<int:id_usuario>', methods=['GET'])
-def obtener_historial(id_usuario):
-    try:
-        historial = asistencia_service.obtener_historial_turnos(id_usuario)
-        return jsonify({'success': True, 'data': historial}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+    return success_response(data, message, http_code)
 
-@asistencia_bp.route('/evidencias/<int:id_asistencia>', methods=['GET'])
-def obtener_evidencias(id_asistencia):
-    try:
-        evidencias = asistencia_service.obtener_evidencias_asistencia(id_asistencia)
-        return jsonify({'success': True, 'data': evidencias}), 200
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)}), 500
+
+@asistencia_bp.route("/api/asistencias/detalle/<int:idUsuario>", methods=["GET"])
+@jwt_required()
+def obtener_detalle(idUsuario):
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_detalle(idUsuario)
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+
+
+@asistencia_bp.route("/api/asistencias/historial/<int:idUsuario>", methods=["GET"])
+@jwt_required()
+def obtener_historial(idUsuario):
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_historial(idUsuario)
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+
+
+@asistencia_bp.route("/api/asistencias/evidencias/<int:idAsistencia>", methods=["GET"])
+@jwt_required()
+def obtener_evidencias(idAsistencia):
+    service = AsistenciaService()
+    data, message, http_code = service.obtener_evidencias(idAsistencia)
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
