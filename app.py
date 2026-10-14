@@ -5,6 +5,9 @@ from utils.json_provider import CustomJSONProvider
 from routes.asistencia_routes import asistencia_bp
 from routes.auth_routes import auth_bp
 from routes.usuario_routes import usuario_bp
+from routes.punto_venta_routes import punto_venta_bp
+from routes.pedido_routes import pedido_bp
+from routes.control_routes import control_bp
 
 
 def create_app():
@@ -17,7 +20,10 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(usuario_bp)
-    app.register_blueprint(asistencia_bp, url_prefix="/api/asistencias")
+    app.register_blueprint(asistencia_bp)
+    app.register_blueprint(punto_venta_bp)
+    app.register_blueprint(pedido_bp)
+    app.register_blueprint(control_bp)
 
     @app.get("/")
     def inicio():
