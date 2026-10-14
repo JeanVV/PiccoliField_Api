@@ -16,7 +16,7 @@ class SupervisionRepository:
                 INNER JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
                 LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario
-                WHERE u.rol = 'VENDEDOR'
+                WHERE u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
                 GROUP BY u.idUsuario, u.nombres, u.apePaterno, pdv.puntosVenta -- ¡Aquí se agregó la columna!
                 ORDER BY cantidadVendida DESC;
             """
@@ -70,7 +70,7 @@ class SupervisionRepository:
                 FROM USUARIOS u
                 LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario
                 LEFT JOIN VENTAS v ON u.idUsuario = v.idUsuario
-                WHERE u.idUsuario = %s AND u.rol = 'VENDEDOR'
+                WHERE u.idUsuario = %s AND u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
                 GROUP BY u.idUsuario, pdv.puntosVenta, u.meta_mensual
             """
             cursor.execute(sql_info, (idUsuario,))
