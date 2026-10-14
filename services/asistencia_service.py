@@ -1,4 +1,3 @@
-from MySQLdb import connections
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository
 
