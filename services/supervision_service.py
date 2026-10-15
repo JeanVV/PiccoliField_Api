@@ -93,3 +93,43 @@ class SupervisionService:
             return None, "Error interno", 500
         finally:
             connection.close()
+
+
+    def listar_prospectos(self):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data = repo.listar_prospectos()
+            
+            if data is None:
+                return None, "Error interno al obtener prospectos", 500
+                
+            return data, "Prospectos obtenidos exitosamente", 200
+        except Exception as e:
+            print(f"Error en listar_prospectos: {e}")
+            return None, "Error interno", 500
+        finally:
+            connection.close()
+
+
+
+    def actualizar_prospecto(self, idPr):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            actualizado = repo.actualizar_prospecto(idPr)
+
+            if not actualizado:
+                return None, "Prospecto no encontrado o sin cambios", 404
+
+            return {"idProspecto": idPr}, "Prospecto actualizado exitosamente", 200
+        finally:
+            connection.close()
+
+
+
+
+
+
+
+
