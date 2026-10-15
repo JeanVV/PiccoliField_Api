@@ -139,3 +139,46 @@ class SupervisionRepository:
             return cursor.fetchone()
         finally:
             cursor.close()
+
+    def listar_puntos_venta(self):
+        cursor = self.connection.cursor()
+        try:
+            query = """
+                SELECT 
+                    idPuntosVenta AS id, 
+                    puntosVenta AS nombre, 
+                    direccion, 
+                    estado 
+                FROM PUNTOS_VENTA
+                ORDER BY puntosVenta ASC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error en listar_puntos_venta: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def listar_alertas(self):
+        cursor = self.connection.cursor()
+        try:
+            query = """
+                SELECT 
+                    a.idAlertas AS idAlerta,
+                    a.estado AS estado_resolucion,
+                    a.tipo AS nivel_alerta,
+                    pv.puntosVenta AS local_nombre,
+                    p.producto AS nombre_producto
+                FROM ALERTAS_STOCK a
+                INNER JOIN PUNTOS_VENTA pv ON a.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN PRODUCTOS p ON a.idProductos = p.idProductos
+                ORDER BY a.idAlertas DESC
+            """
+            cursor.execute(query)
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error en listar_alertas: {e}")
+            return None
+        finally:
+            cursor.close()
