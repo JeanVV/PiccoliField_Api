@@ -182,39 +182,3 @@ class SupervisionRepository:
             return None
         finally:
             cursor.close()
-
-
-    def listar_prospectos(self):
-        cursor = self.connection.cursor()
-        try:
-            query = """
-                SELECT 
-                    idProspectos AS id, 
-                    nombre_comercial, 
-                    direccion, 
-                    estado 
-                FROM PROSPECTOS
-                ORDER BY nombre_comercial ASC
-            """
-            cursor.execute(query)
-            return cursor.fetchall()
-        except Exception as e:
-            print(f"Error en listar_prospectos: {e}")
-            return None
-        finally:
-            cursor.close()
-
-    def actualizar_prospecto(self, idPr):
-        cursor = self.connection.cursor()
-        try:
-            sql = "UPDATE PROSPECTOS SET estado = 'CONVERTIDO' WHERE idProspecto = %s"
-            cursor.execute(sql, (idPr,))
-            self.connection.commit()
-            return cursor.rowcount > 0 
-        except Exception as e:
-            self.connection.rollback()
-            print(f"Error al actualizar prospecto: {e}")
-            return False
-        finally:
-            cursor.close()
-
