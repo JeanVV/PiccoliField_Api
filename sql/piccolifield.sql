@@ -12,14 +12,14 @@ CREATE TABLE PROVINCIA (
     idProvincia INT AUTO_INCREMENT PRIMARY KEY,
     provincia VARCHAR(100) NOT NULL,
     idDepartamento INT NOT NULL,
-    FOREIGN KEY (idDepartamento) REFERENCES DEPARTAMENTO(idDepartamento)
+    FOREIGN KEY (idDepartamento) REFERENCES DEPARTAMENTO(idDepartamento) ON DELETE CASCADE
 );
 
 CREATE TABLE DISTRITO (
     idDistrito INT AUTO_INCREMENT PRIMARY KEY,
     distrito VARCHAR(100) NOT NULL,
     idProvincia INT NOT NULL,
-    FOREIGN KEY (idProvincia) REFERENCES PROVINCIA(idProvincia)
+    FOREIGN KEY (idProvincia) REFERENCES PROVINCIA(idProvincia) ON DELETE CASCADE
 );
 
 -- 2. CATÁLOGO DE PRODUCTOS
@@ -29,7 +29,8 @@ CREATE TABLE PRODUCTOS (
     codigo_ean VARCHAR(50) UNIQUE,
     producto VARCHAR(150) NOT NULL,
     categoria VARCHAR(100) NOT NULL,
-    presentacion VARCHAR(100),
+    descripcion TEXT,
+    url_foto VARCHAR(255),
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO'
 );
 
@@ -48,56 +49,60 @@ CREATE TABLE USUARIOS (
     idUsuario INT AUTO_INCREMENT PRIMARY KEY,
     nombres VARCHAR(150) NOT NULL,
     apePaterno VARCHAR(100) NOT NULL,
-    apeMaterno VARCHAR(100) NOT NULL,
+    apeMaterno VARCHAR(100) NOT NULL, 
     correo VARCHAR(150) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
-    foto_perfil VARCHAR(255),
-    rol ENUM('ADMINISTRADOR', 'PROMOTOR', 'IMPULSADOR') NOT NULL,
-    fcm_token VARCHAR(255),
-    id_dispositivo VARCHAR(100),
+    rol ENUM('ADMINISTRADOR', 'PROMOTOR', 'IMPULSADOR', 'TRABAJADOR') NOT NULL,
+    fcm_token VARCHAR(255) NULL,
+    id_dispositivo VARCHAR(100) NULL, 
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO',
+    url_foto VARCHAR(255) NULL,
+    meta_ventas INT NOT NULL DEFAULT 0,
     idDistrito INT NOT NULL,
     idSede INT NOT NULL,
     FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),
     FOREIGN KEY (idSede) REFERENCES SEDES(idSede)
 );
 
--- 5. ASISTENCIAS
-CREATE TABLE ASISTENCIAS (
-    idAsistencias INT AUTO_INCREMENT PRIMARY KEY,
-    id_turno VARCHAR(50) NOT NULL,
-    tipo ENUM('INGRESO', 'SALIDA') NOT NULL,
-    fecha_hora_servidor DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    fecha_hora_dispositivo DATETIME NOT NULL,
-    estado ENUM('A_TIEMPO', 'TARDANZA', 'FALTA') NOT NULL DEFAULT 'A_TIEMPO',
-    minutos_tardanza INT DEFAULT 0,
-    idUsuario INT NOT NULL,
-    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
-);
-
--- 6. PUNTOS DE VENTA (IMPACTO)
+-- 5. PUNTOS DE VENTA 
 CREATE TABLE PUNTOS_VENTA (
     idPuntosVenta INT AUTO_INCREMENT PRIMARY KEY,
     codigo VARCHAR(50) NOT NULL UNIQUE,
-    puntosVenta VARCHAR(150) NOT NULL,
+    puntoVenta VARCHAR(150) NOT NULL,
     direccion VARCHAR(255) NOT NULL,
     estado ENUM('ACTIVO', 'INACTIVO', 'CLAUSURADO') NOT NULL DEFAULT 'ACTIVO',
     latitud DECIMAL(10, 8) NOT NULL,
     longitud DECIMAL(11, 8) NOT NULL,
+    tipo ENUM('VENTA', 'DISTRIBUCIÓN') NOT NULL,
     idDistrito INT NOT NULL,
-    idUsuario INT NOT NULL, -- Agregado para coincidir con la relación USUARIOSidUsuario del diagrama
+    idUsuario INT NOT NULL,
     FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
 
--- 7. PROSPECTOS (EXPANSIÓN)
+-- 6. ASISTENCIAS
+CREATE TABLE ASISTENCIAS (
+    idAsistencias INT AUTO_INCREMENT PRIMARY KEY,
+    tipo ENUM('INGRESO', 'SALIDA') NOT NULL,
+    fecha_hora_servidor DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    fecha_hora_dispositivo DATETIME NOT NULL,
+    estado ENUM('A_TIEMPO', 'TARDANZA', 'FALTA') NOT NULL DEFAULT 'A_TIEMPO',
+    minutos_tardanza INT NOT NULL DEFAULT 0,
+    latitud DECIMAL(10, 8) NULL,
+    longitud DECIMAL(11, 8) NULL,
+    radio DECIMAL(10, 2) NULL,
+    idUsuario INT NOT NULL,
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
+);
+
+-- 7. PROSPECTOS
 CREATE TABLE PROSPECTOS (
     idProspectos INT AUTO_INCREMENT PRIMARY KEY,
-    nombre_comercial VARCHAR(150) NOT NULL,
-    tipo_local VARCHAR(100),
+    nombre_comercial VARCHAR(200) NOT NULL,
+    tipo_local VARCHAR(100) NULL,
     direccion VARCHAR(255) NOT NULL,
-    contacto VARCHAR(150),
-    telefono VARCHAR(20),
+    contacto VARCHAR(150) NULL,
+    telefono VARCHAR(20) NULL,
     potencial ENUM('ALTO', 'MEDIO', 'BAJO') NOT NULL DEFAULT 'MEDIO',
     estado ENUM('NUEVO', 'EN_NEGOCIACION', 'CONVERTIDO', 'DESCARTADO') NOT NULL DEFAULT 'NUEVO',
     latitud DECIMAL(10, 8) NOT NULL,
@@ -127,8 +132,12 @@ CREATE TABLE ALERTAS_STOCK (
     idAlertas INT AUTO_INCREMENT PRIMARY KEY,
     tipo VARCHAR(100) NOT NULL,
     estado ENUM('PENDIENTE', 'ATENDIDA', 'IGNORADA') NOT NULL DEFAULT 'PENDIENTE',
-    comentario TEXT,
-    fecha_atencion DATETIME,
+    comentario TEXT NULL,
+    fechaAtencion DATE NULL,
+    fechaEmision DATE NOT NULL DEFAULT (CURRENT_DATE),
+    severidad ENUM('ALTA', 'MEDIA', 'BAJA') NOT NULL DEFAULT 'MEDIA',
+    horaAtencion TIME NULL,
+    horaEmision TIME NOT NULL DEFAULT (CURRENT_TIME),
     idProductos INT NOT NULL,
     idPuntosVenta INT NOT NULL,
     FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos),
@@ -138,7 +147,7 @@ CREATE TABLE ALERTAS_STOCK (
 -- 10. PEDIDO (RENDIMIENTO)
 CREATE TABLE Pedido (
     idPedido INT AUTO_INCREMENT PRIMARY KEY,
-    cantSolicitada INT NOT NULL,
+    cantSolicitada INT NOT NULL CHECK (cantSolicitada > 0),
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     idPuntosVenta INT NOT NULL,
     idProductos INT NOT NULL,
@@ -151,16 +160,12 @@ CREATE TABLE STOCK_REGISTROS (
     idStock INT AUTO_INCREMENT PRIMARY KEY,
     cant_exhibida INT NOT NULL DEFAULT 0,
     cant_almacen INT NOT NULL DEFAULT 0,
-    estado_stock ENUM('OPTIMO', 'BAJO', 'AGOTADO') NOT NULL,
-    observacion TEXT,
+    estadoStock ENUM('OPTIMO', 'BAJO', 'AGOTADO') NOT NULL,
+    observacion TEXT NULL,
     fecha DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    stock_minimo INT NOT NULL,
-    idPuntosVenta INT NOT NULL,
-    idProductos INT NOT NULL,
-    PedidoidPedido INT, 
-    FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta),
-    FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos),
-    FOREIGN KEY (PedidoidPedido) REFERENCES Pedido(idPedido)
+    stock_minimo INT NOT NULL DEFAULT 0,
+    idPedido INT NOT NULL,
+    FOREIGN KEY (idPedido) REFERENCES Pedido(idPedido) ON DELETE CASCADE
 );
 
 -- 12. EVIDENCIAS FOTOGRÁFICAS
@@ -170,29 +175,29 @@ CREATE TABLE EVIDENCIAS (
     hash_sha VARCHAR(64) NOT NULL,
     tipo VARCHAR(50) NOT NULL,
     fecha_captura DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    idStock INT,
-    INCIDENCIASidIncidencias INT,
-    FOREIGN KEY (idStock) REFERENCES STOCK_REGISTROS(idStock),
-    FOREIGN KEY (INCIDENCIASidIncidencias) REFERENCES INCIDENCIAS(idIncidencias)
+    idStock INT NULL,
+    idIncidencias INT NULL,
+    FOREIGN KEY (idStock) REFERENCES STOCK_REGISTROS(idStock) ON DELETE CASCADE,
+    FOREIGN KEY (idIncidencias) REFERENCES INCIDENCIAS(idIncidencias) ON DELETE CASCADE
 );
 
--- 13. VENTAS (NUEVA TABLA)
+-- 13. VENTAS
 CREATE TABLE VENTAS (
     idVenta INT AUTO_INCREMENT PRIMARY KEY,
     fecha DATE NOT NULL,
     hora TIME NOT NULL,
-    total DECIMAL(10, 2) NOT NULL,
+    total DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     idUsuario INT NOT NULL,
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
 
--- 14. DETALLE_VENTA (NUEVA TABLA INTERMEDIA)
+-- 14. DETALLE_VENTA
 CREATE TABLE DETALLE_VENTA (
     idVenta INT NOT NULL,
     idProductos INT NOT NULL,
     precio DECIMAL(10, 2) NOT NULL,
-    cantidad INT NOT NULL,
+    cantidad INT NOT NULL CHECK (cantidad > 0),
     PRIMARY KEY (idVenta, idProductos),
-    FOREIGN KEY (idVenta) REFERENCES VENTAS(idVenta),
+    FOREIGN KEY (idVenta) REFERENCES VENTAS(idVenta) ON DELETE CASCADE,
     FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos)
 );
