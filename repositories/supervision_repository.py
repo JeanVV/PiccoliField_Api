@@ -10,15 +10,15 @@ class SupervisionRepository:
                 SELECT 
                     u.idUsuario,
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
-                    pdv.puntosVenta AS local, 
+                    pdv.puntoVenta AS local, 
                     SUM(dv.cantidad) AS cantidadVendida,
-                    u.meta_mensual AS meta_asignada
+                    u.meta_ventas AS meta_asignada
                 FROM USUARIOS u
                 INNER JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
                 LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario
                 WHERE u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
-                GROUP BY u.idUsuario, u.nombres, u.apePaterno, pdv.puntosVenta,u.meta_mensual
+                GROUP BY u.idUsuario, u.nombres, u.apePaterno, pdv.puntoVenta,u.meta_ventas
                 ORDER BY cantidadVendida DESC;
             """
             cursor.execute(sql)
@@ -65,14 +65,14 @@ class SupervisionRepository:
             sql_info = """
                 SELECT 
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
-                    pdv.puntosVenta AS local_pertenece,
-                    u.meta_mensual AS meta_asignada,
+                    pdv.puntoVenta AS local_pertenece,
+                    u.meta_ventas AS meta_asignada,
                     COALESCE(SUM(v.total), 0) AS monto_vendido
                 FROM USUARIOS u
                 LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario
                 LEFT JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 WHERE u.idUsuario = %s AND u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
-                GROUP BY u.idUsuario, pdv.puntosVenta, u.meta_mensual
+                GROUP BY u.idUsuario, pdv.puntoVenta, u.meta_ventas
             """
             cursor.execute(sql_info, (idUsuario,))
             vendedor = cursor.fetchone()
@@ -120,7 +120,7 @@ class SupervisionRepository:
                     p.producto AS nombre_producto,
                     COALESCE(sr.cant_almacen, 0) AS stock_actual,
                     COALESCE(sr.stock_minimo, 0) AS stock_minimo,
-                    pdv.puntosVenta AS local_nombre,
+                    pdv.puntoVenta AS local_nombre,
                     pdv.direccion AS local_direccion,
                     CONCAT(u.nombres, ' ', u.apePaterno) AS responsable_nombre,
                     u.rol AS responsable_rol,
@@ -130,10 +130,11 @@ class SupervisionRepository:
                 INNER JOIN PRODUCTOS p ON a.idProductos = p.idProductos
                 INNER JOIN PUNTOS_VENTA pdv ON a.idPuntosVenta = pdv.idPuntosVenta
                 INNER JOIN USUARIOS u ON pdv.idUsuario = u.idUsuario
-                LEFT JOIN STOCK_REGISTROS sr ON sr.idProductos = p.idProductos AND sr.idPuntosVenta = pdv.idPuntosVenta
+                LEFT JOIN Pedido ped ON ped.idProductos = a.idProductos AND ped.idPuntosVenta = a.idPuntosVenta
+                LEFT JOIN STOCK_REGISTROS sr ON sr.idPedido = ped.idPedido
                 WHERE a.idAlertas = %s
                 ORDER BY sr.fecha DESC
-                LIMIT 1
+                LIMIT 1;
             """
             cursor.execute(sql, (idAlerta,))
             return cursor.fetchone()
@@ -146,11 +147,11 @@ class SupervisionRepository:
             query = """
                 SELECT 
                     idPuntosVenta AS id, 
-                    puntosVenta AS nombre, 
+                    puntoVenta AS nombre, 
                     direccion, 
                     estado 
                 FROM PUNTOS_VENTA
-                ORDER BY puntosVenta ASC
+                ORDER BY puntoVenta ASC
             """
             cursor.execute(query)
             return cursor.fetchall()
@@ -168,7 +169,7 @@ class SupervisionRepository:
                     a.idAlertas AS idAlerta,
                     a.estado AS estado_resolucion,
                     a.tipo AS nivel_alerta,
-                    pv.puntosVenta AS local_nombre,
+                    pv.puntoVenta AS local_nombre,
                     p.producto AS nombre_producto
                 FROM ALERTAS_STOCK a
                 INNER JOIN PUNTOS_VENTA pv ON a.idPuntosVenta = pv.idPuntosVenta

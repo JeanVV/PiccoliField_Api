@@ -50,20 +50,6 @@ class AsistenciaService:
         finally:
             connection.close()
 
-    # ── GET /api/asistencias/detalle/<idUsuario> ──────────────────────────────
-    def obtener_detalle(self, idUsuario):
-        connection = get_connection()
-        try:
-            repository = AsistenciaRepository(connection)
-            asistencia = repository.get_detalle_usuario(idUsuario)
-
-            if asistencia is None:
-                return None, "No se encontró asistencia de hoy para este usuario", 404
-
-            return asistencia, "Detalle obtenido correctamente", 200
-        finally:
-            connection.close()
-
     # ── GET /api/asistencias/historial/<idUsuario> ────────────────────────────
     def obtener_historial(self, idUsuario):
         connection = get_connection()
@@ -72,27 +58,4 @@ class AsistenciaService:
             historial = repository.get_historial(idUsuario)
             return historial, "Historial obtenido correctamente", 200
         finally:
-            connection.close()
-
-    # ── GET /api/asistencias/evidencias/<idAsistencia> ───────────────────────
-    def obtener_evidencias(self, idAsistencia):
-        connection = get_connection()
-        try:
-            repository = AsistenciaRepository(connection)
-            evidencias = repository.get_evidencias(idAsistencia)
-            return evidencias, "Evidencias obtenidas correctamente", 200
-        finally:
-            connection.close()  
-
-    def marcarAsistenciaPersonal(self, idUsuario, Tipo): 
-        connection = get_connection()
-        try: 
-            repository = AsistenciaRepository(connection)  
-            if repository.verificarHorarioTurnoPersonal(idUsuario) == True:
-                return None, "Usuario no tiene horario de turno", 404
-            
-            repository.marcarAsistenciaPersonal(idUsuario, Tipo) 
-            asistencia = repository.asistenciaPersonal(idUsuario, Tipo)
-            return asistencia, "Asistencia marcada correctamente", 202
-        finally: 
             connection.close()

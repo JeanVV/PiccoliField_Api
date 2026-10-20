@@ -36,7 +36,7 @@ class AsistenciaRepository:
                     u.nombres,
                     u.apePaterno,
                     u.apeMaterno,
-                    u.foto_perfil,
+                    u.url_foto,
                     s.sede,
                     a.estado,
                     DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo,
@@ -63,7 +63,7 @@ class AsistenciaRepository:
                     u.nombres,
                     u.apePaterno,
                     u.apeMaterno,
-                    u.foto_perfil,
+                    u.url_foto,
                     s.sede,
                     COALESCE(a.estado, 'SIN_REGISTRO') AS estado,
                     DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo
@@ -77,35 +77,6 @@ class AsistenciaRepository:
             """
             cursor.execute(sql)
             return cursor.fetchall()
-        finally:
-            cursor.close()
-
-    def get_detalle_usuario(self, idUsuario):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-                SELECT 
-                    u.idUsuario,
-                    u.nombres,
-                    u.apePaterno,
-                    u.apeMaterno,
-                    u.foto_perfil,
-                    s.sede,
-                    a.estado,
-                    DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo,
-                    DATE_FORMAT(a.fecha_hora_servidor, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_servidor,
-                    a.minutos_tardanza,
-                    a.id_turno
-                FROM USUARIOS u
-                INNER JOIN SEDES s ON u.idSede = s.idSede
-                INNER JOIN ASISTENCIAS a ON u.idUsuario = a.idUsuario 
-                    AND DATE(a.fecha_hora_servidor) = CURDATE()
-                WHERE u.idUsuario = %s
-                ORDER BY a.fecha_hora_servidor DESC
-                LIMIT 1
-            """
-            cursor.execute(sql, (idUsuario,))
-            return cursor.fetchone()
         finally:
             cursor.close()
 
@@ -126,75 +97,3 @@ class AsistenciaRepository:
             return cursor.fetchall()
         finally:
             cursor.close()
-
-    def get_evidencias(self, idAsistencia):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-                SELECT 
-                    idEvidencias,
-                    ruta_archivo,
-                    hash_sha,
-                    tipo,
-                    DATE_FORMAT(fecha_captura, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_captura,
-                    idStock,
-                    INCIDENCIASidIncidencias AS idIncidencia
-                FROM EVIDENCIAS
-                WHERE idAsistencias = %s
-            """
-            cursor.execute(sql, (idAsistencia,))
-            return cursor.fetchall()
-        finally:
-            cursor.close()
-
-    def marcarAsistenciaPersonal(self, idUsuario, tipo):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-                INSERT INTO ASISTENCIAS 
-                    (id_turno, tipo, fecha_hora_dispositivo, fecha_hora_servidor, idUsuario)
-                VALUES 
-                    (%s, %s, NOW(), NOW(), %s)
-            """
-            cursor.execute(sql, (idUsuario, tipo, idUsuario))
-            self.connection.commit()
-            return cursor.lastrowid
-        finally:
-            cursor.close()
-    
-    def verificarHorarioTurnoPersonal(self, idUsuario):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-                SELECT 
-                    t.horaEntrada,
-                    t.horaSalida
-                FROM USUARIOS u
-                INNER JOIN TURNOS t ON u.idTurno = t.idTurno
-                WHERE u.idUsuario = %s
-            """
-            cursor.execute(sql, (idUsuario,))
-            return cursor.fetchone()
-        finally:
-            cursor.close() 
-
-    def asistenciaPersonal(self, idUsuario, tipo):
-        cursor = self.connection.cursor()
-        try:
-            sql = """
-                SELECT 
-                    a.fecha_hora_servidor as fecha,
-                    a.fecha_hora_dispositivo as hora,
-                    a.minutos_tardanza,
-                    a.tipo,
-                    a.idUsuario
-                FROM USUARIOS u
-                INNER JOIN TURNOS t ON u.idTurno = t.idTurno
-                inner Join ASISTENCIAS a ON u.idUsuario = a.idUsuario
-                WHERE u.idUsuario = %s
-            """
-            cursor.execute(sql, (idUsuario,))
-            return cursor.fetchone()
-        finally:
-            cursor.close() 
-    

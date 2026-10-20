@@ -1,35 +1,16 @@
 {
   "info": {
-    "_postman_id": "399be59b-ebe2-4438-ae91-8237a723323e",
+    "_postman_id": "9bd18900-002d-43ee-ae21-81c0fa338fc3",
     "name": "PiccoliField API - Despacho y Puntos de Distribución",
     "description": "Colección completa para Piccoli Cocktail API. Incluye Auth, Puntos de Distribución, Mapa de Calor, Pedidos, Despachos, Repartidores y Control de Jefa/Promotor.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "_exporter_id": "40681461"
+    "_exporter_id": "49805754",
+    "_collection_link": "https://go.postman.co/collection/49805754-9bd18900-002d-43ee-ae21-81c0fa338fc3?source=collection_link"
   },
   "item": [
     {
       "name": "0. Verificación y Autenticación",
       "item": [
-        {
-          "name": "Verificar Estado de API (Ping)",
-          "request": {
-            "auth": {
-              "type": "noauth"
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                ""
-              ]
-            }
-          },
-          "response": []
-        },
         {
           "name": "Login (Obtener Token)",
           "event": [
@@ -38,7 +19,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "var jsonData = pm.response.json();\nif (jsonData.data && jsonData.data.token) {\n    pm.collectionVariables.set('token', jsonData.data.token);\n    console.log('Token guardado automáticamente en la colección');\n}"
+                  "var jsonData = pm.response.json();\nif (jsonData.data && jsonData.data.token) {\n    pm.collectionVariables.set('token', jsonData.data.token);\n    pm.environment.set('token', jsonData.data.token);\n    console.log('Token guardado automáticamente en la colección y entorno');\n}"
                 ]
               }
             }
@@ -56,7 +37,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"correo\": \"admin@piccoli.pe\",\n    \"password\": \"hash_12345\"\n}",
+              "raw": "{\n    \"correo\": \"luis.bances@piccoli.test\",\n    \"password\": \"Piccoli2026!\"\n}",
               "options": {
                 "raw": {
                   "language": "text"
@@ -64,12 +45,11 @@
               }
             },
             "url": {
-              "raw": "{{base_url}}/api/auth/login",
+              "raw": "{{url}}/auth/login",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
                 "auth",
                 "login"
               ]
@@ -83,12 +63,11 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/perfil",
+              "raw": "{{url}}/perfil",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
                 "perfil"
               ]
             }
@@ -107,15 +86,19 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"fcm_token\": \"fcm_token_ejemplo_android_12345\",\n    \"id_dispositivo\": \"dispositivo_pixel_7a\"\n}"
+              "raw": "{\n    \"fcm_token\": \"fcm_token_ejemplo_android_12345\",\n    \"id_dispositivo\": \"dispositivo_pixel_7a\"\n}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
             },
             "url": {
-              "raw": "{{base_url}}/api/perfil/fcm-token",
+              "raw": "{{url}}/perfil/fcm-token",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
                 "perfil",
                 "fcm-token"
               ]
@@ -134,867 +117,22 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/puntos-venta?search=Buen Sabor&categoria=Tienda&distrito=1",
+              "raw": "{{url}}/puntos-venta",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
-                "puntos-venta"
-              ],
-              "query": [
-                {
-                  "key": "search",
-                  "value": "Buen Sabor"
-                },
-                {
-                  "key": "categoria",
-                  "value": "Tienda"
-                },
-                {
-                  "key": "distrito",
-                  "value": "1"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Puntos Más Cercanos (Geolocalización GPS)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/cercanos?lat=-12.046374&lng=-77.042793&radio_km=5",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "cercanos"
-              ],
-              "query": [
-                {
-                  "key": "lat",
-                  "value": "-12.046374"
-                },
-                {
-                  "key": "lng",
-                  "value": "-77.042793"
-                },
-                {
-                  "key": "radio_km",
-                  "value": "5"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Detalle del Punto de Distribución",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Productos Disponibles en el Punto (Cócteles)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1/productos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1",
-                "productos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Registrar Nuevo Punto de Distribución",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"codigo\": \"PV-005\",\n    \"puntosVenta\": \"Licorería El Buen Sabor\",\n    \"tipo_local\": \"Tienda\",\n    \"direccion\": \"Av. Principal 123, Lima\",\n    \"telefono\": \"+51 987 654 321\",\n    \"horario\": \"Lun - Dom 8:00 a.m. - 10:00 p.m.\",\n    \"latitud\": -12.04637400,\n    \"longitud\": -77.04279300,\n    \"idDistrito\": 1,\n    \"idUsuario\": 1\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
                 "puntos-venta"
               ]
             }
           },
           "response": []
-        },
-        {
-          "name": "Actualizar Punto de Distribución Completo",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"puntosVenta\": \"Licorería El Buen Sabor Central\",\n    \"tipo_local\": \"Tienda\",\n    \"direccion\": \"Av. Principal 125, Lima\",\n    \"telefono\": \"+51 987 654 321\",\n    \"horario\": \"Lun - Dom 9:00 a.m. - 11:00 p.m.\",\n    \"latitud\": -12.04637400,\n    \"longitud\": -77.04279300,\n    \"idDistrito\": 1\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Cambiar Estado del Punto de Distribución",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"estado\": \"ACTIVO\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1/estado",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1",
-                "estado"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Eliminar Punto de Distribución",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1"
-              ]
-            }
-          },
-          "response": []
         }
       ]
     },
     {
-      "name": "2. Mapa de Calor y Demanda",
+      "name": "2. Módulo de Asistencias",
       "item": [
-        {
-          "name": "Datos para Mapa de Calor (Heatmap Coordinates)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/mapa-calor/pedidos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "mapa-calor",
-                "pedidos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Zonas de Alta y Baja Demanda",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/mapa-calor/zonas?distrito=1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "mapa-calor",
-                "zonas"
-              ],
-              "query": [
-                {
-                  "key": "distrito",
-                  "value": "1"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Historial de Productos Solicitados del Punto",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1/historial-pedidos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1",
-                "historial-pedidos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Resumen Estadístico de Demanda del Punto",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/puntos-venta/1/resumen-demanda",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "puntos-venta",
-                "1",
-                "resumen-demanda"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "3. Pedidos y Reabastecimiento",
-      "item": [
-        {
-          "name": "Listar Pedidos",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/pedidos?estado=PENDIENTE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos"
-              ],
-              "query": [
-                {
-                  "key": "estado",
-                  "value": "PENDIENTE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Crear Pedido de Stock (Transacción)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"idPuntosVenta\": 1,\n    \"productos\": [\n        {\n            \"idProductos\": 1,\n            \"cantSolicitada\": 24\n        },\n        {\n            \"idProductos\": 2,\n            \"cantSolicitada\": 12\n        }\n    ]\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pedidos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Ver Detalle de un Pedido",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/pedidos/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Modificar Pedido",
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"cantSolicitada\": 30\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pedidos/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Cancelar Pedido",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"motivo\": \"Error en cantidad solicitada por promotor\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/pedidos/1/cancelar",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos",
-                "1",
-                "cancelar"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Eliminar Pedido Pendiente",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/pedidos/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "pedidos",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "4. Despacho y Repartidores",
-      "item": [
-        {
-          "name": "Listar Repartidores Disponibles",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/repartidores/disponibles",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "repartidores",
-                "disponibles"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Listar Órdenes de Despacho",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/despachos?estado=PENDIENTE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos"
-              ],
-              "query": [
-                {
-                  "key": "estado",
-                  "value": "PENDIENTE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Crear Orden de Despacho (Jefa)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"idPedido\": 1,\n    \"idRepartidor\": 2,\n    \"fecha_programada\": \"2026-10-15\",\n    \"observacion\": \"Entregar antes de las 12 pm\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/despachos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Asignar Repartidor a Despacho",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"idRepartidor\": 3\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/despachos/1/asignar-repartidor",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos",
-                "1",
-                "asignar-repartidor"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Mis Despachos Asignados (Vista Repartidor)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/repartidor/mis-despachos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "repartidor",
-                "mis-despachos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Iniciar Ruta de Despacho",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"latitud_salida\": -12.046374,\n    \"longitud_salida\": -77.042793\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/despachos/1/iniciar-ruta",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos",
-                "1",
-                "iniciar-ruta"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Completar Entrega en Punto de Venta (Transacción)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"cant_entregada\": 24,\n    \"recibido_por\": \"Carlos Méndez (Administrador de Tienda)\",\n    \"observaciones\": \"Todo conforme y sellado\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/despachos/1/completar-entrega",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos",
-                "1",
-                "completar-entrega"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Transmitir Ubicación en Tiempo Real del Repartidor",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"latitud\": -12.051020,\n    \"longitud\": -77.039820,\n    \"bateria\": 85\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/repartidor/ubicacion-actual",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "repartidor",
-                "ubicacion-actual"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Anular Despacho",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/despachos/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "despachos",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        }
-      ]
-    },
-    {
-      "name": "5. Control de Supervisión (Jefa y Promotores)",
-      "item": [
-        {
-          "name": "Listar Promotores con Estado",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/promotores",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "promotores"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Asignar Promotor a Punto de Distribución",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"idUsuario\": 2,\n    \"idPuntosVenta\": 1\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/control/asignar-punto",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "asignar-punto"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Ver Puntos Asignados a un Promotor",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/promotores/2/puntos",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "promotores",
-                "2",
-                "puntos"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Supervisión de Asistencias en Puntos",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/asistencias-puntos?fecha=2026-10-14",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "asistencias-puntos"
-              ],
-              "query": [
-                {
-                  "key": "fecha",
-                  "value": "2026-10-14"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Alertas de Stock Bajo o Quiebre (Urgentes)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/alertas-stock?estado=PENDIENTE",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "alertas-stock"
-              ],
-              "query": [
-                {
-                  "key": "estado",
-                  "value": "PENDIENTE"
-                }
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Atender Alerta de Stock",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"comentario\": \"Se generó orden de despacho prioritaria\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/control/alertas-stock/1/atender",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "alertas-stock",
-                "1",
-                "atender"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Dashboard KPIs de la Jefa",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/dashboard-kpis",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "dashboard-kpis"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
-          "name": "Desasignar Promotor de un Punto de Venta",
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/control/desasignar-punto/1",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "control",
-                "desasignar-punto",
-                "1"
-              ]
-            }
-          },
-          "response": []
-        },
         {
           "name": "Resumen General de Asistencias",
           "request": {
@@ -1114,35 +252,6 @@
           "response": []
         },
         {
-          "name": "Detalle de Registro por Colaborador",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{token}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{url}}/asistencias/detalle/2",
-              "host": [
-                "{{url}}"
-              ],
-              "path": [
-                "asistencias",
-                "detalle",
-                "2"
-              ]
-            }
-          },
-          "response": []
-        },
-        {
           "name": "Historial de Turnos Asignados",
           "request": {
             "auth": {
@@ -1174,68 +283,123 @@
       ]
     },
     {
-      "name": "6. Catálogo Auxiliar (App Móvil)",
+      "name": "3. Módulo de Supervisión",
       "item": [
         {
-          "name": "Listar Categorías de Locales (Chips del Filtro)",
+          "name": "Mejores impulsadores",
           "request": {
-            "auth": {
-              "type": "noauth"
-            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/categorias-locales",
+              "raw": "{{url}}/supervision/vendedores",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
-                "categorias-locales"
+                "supervision",
+                "vendedores"
               ]
             }
           },
           "response": []
         },
         {
-          "name": "Listar Cócteles Piccoli (Destacados)",
+          "name": "Información puntos de venta",
           "request": {
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/productos/destacados",
+              "raw": "{{url}}/supervision/puntos-venta",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
-                "productos",
-                "destacados"
+                "supervision",
+                "puntos-venta"
               ]
             }
           },
           "response": []
         },
         {
-          "name": "Listar Distritos Activos con Puntos de Venta",
+          "name": "Resumen de alertas y pdv",
           "request": {
-            "auth": {
-              "type": "noauth"
-            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/geografia/distritos-activos",
+              "raw": "{{url}}/supervision/resumen",
               "host": [
-                "{{base_url}}"
+                "{{url}}"
               ],
               "path": [
-                "api",
-                "geografia",
-                "distritos-activos"
+                "supervision",
+                "resumen"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de ventas de impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/vendedores/8",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de una alerta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/alertas/1",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Lista de alertas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/alertas",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas"
               ]
             }
           },

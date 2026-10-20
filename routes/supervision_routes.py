@@ -30,7 +30,6 @@ def resumen_dashboard():
 @supervision_bp.route("/api/supervision/vendedores/<int:idUsuario>", methods=["GET"])
 @jwt_required()
 def detalle_vendedor(idUsuario):
-    # Nota: <int:idUsuario> permite atrapar el número que mandes en la URL
     service = SupervisionService()
     data, message, http_code = service.obtener_detalle_vendedor(idUsuario)
     
@@ -48,16 +47,6 @@ def detalle_alerta(idAlerta):
         return error_response(message, http_code)
     return success_response(data, message, http_code)
 
-@supervision_bp.route("/api/supervision/puntos-venta", methods=["GET"])
-@jwt_required()
-def listar_puntos_venta():
-    service = SupervisionService()
-    data, message, http_code = service.listar_puntos_venta()
-    
-    if data is None:
-        return error_response(message, http_code)
-    return success_response(data, message, http_code)
-
 @supervision_bp.route("/api/supervision/alertas", methods=["GET"])
 @jwt_required()
 def listar_alertas():
@@ -68,3 +57,12 @@ def listar_alertas():
         return error_response(message, http_code)
     return success_response(data, message, http_code)
 
+@supervision_bp.route("/api/supervision/puntos-venta", methods=["GET"])
+@jwt_required()
+def listar_puntos_venta():
+    service = SupervisionService()
+    data, message, http_code = service.listar_puntos_venta()
+    
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
