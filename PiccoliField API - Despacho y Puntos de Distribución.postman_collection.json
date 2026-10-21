@@ -421,7 +421,7 @@
   "variable": [
     {
       "key": "base_url",
-      "value": "https://piccolifield-api.onrender.com"
+      "value": "https://piccolifield-api-smkc.onrender.com/api"
     },
     {
       "key": "token",
