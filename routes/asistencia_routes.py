@@ -7,6 +7,7 @@ from utils.response import error_response, success_response
 asistencia_bp = Blueprint("asistencias", __name__)
 
 
+# ── 1. Resumen de Asistencias del Día ────────────────────────────────────────
 @asistencia_bp.route("/api/asistencias/resumen", methods=["GET"])
 @jwt_required()
 def obtener_resumen():
@@ -19,6 +20,7 @@ def obtener_resumen():
     return success_response(data, message, http_code)
 
 
+# ── 2. Asistencias Recientes ─────────────────────────────────────────────────
 @asistencia_bp.route("/api/asistencias/recientes", methods=["GET"])
 @jwt_required()
 def obtener_recientes():
@@ -33,6 +35,7 @@ def obtener_recientes():
     return success_response(data, message, http_code)
 
 
+# ── 3. Lista de Colaboradores con Asistencia ─────────────────────────────────
 @asistencia_bp.route("/api/asistencias/colaboradores", methods=["GET"])
 @jwt_required()
 def obtener_colaboradores():
@@ -45,6 +48,7 @@ def obtener_colaboradores():
     return success_response(data, message, http_code)
 
 
+# ── 4. Historial de Turnos de un Colaborador ─────────────────────────────────
 @asistencia_bp.route("/api/asistencias/historial/<int:idUsuario>", methods=["GET"])
 @jwt_required()
 def obtener_historial(idUsuario):
@@ -56,43 +60,41 @@ def obtener_historial(idUsuario):
 
     return success_response(data, message, http_code)
 
+
+# ── 5. Marcar Asistencia (Ingreso / Salida) ──────────────────────────────────
 @asistencia_bp.route("/api/asistencias/marcar", methods=["POST"])
 @jwt_required()
 def marcar_asistencia():
-    data = request.get_json()
-    if not data:
-        return error_response("Cuerpo de la petición vacío", 400)
-
+    payload = request.get_json() or {}
     service = AsistenciaService()
-    resultado, message, http_code = service.registrar_asistencia(data)
+    data, message, http_code = service.registrar_asistencia(payload)
 
-    if resultado is None:
+    if data is None:
         return error_response(message, http_code)
 
-    return success_response(resultado, message, http_code)
+    return success_response(data, message, http_code)
 
 
+# ── 6. Enviar Justificación de Inasistencia / Tardanza ───────────────────────
 @asistencia_bp.route("/api/asistencias/justificar", methods=["POST"])
 @jwt_required()
 def registrar_justificacion():
-    data = request.get_json()
-    if not data:
-        return error_response("Cuerpo de la petición vacío", 400)
-
+    payload = request.get_json() or {}
     service = AsistenciaService()
-    resultado, message, http_code = service.registrar_justificacion(data)
+    data, message, http_code = service.registrar_justificacion(payload)
 
-    if resultado is None:
+    if data is None:
         return error_response(message, http_code)
 
-    return success_response(resultado, message, http_code)
+    return success_response(data, message, http_code)
 
 
+# ── 7. Obtener Última Justificación de un Usuario ────────────────────────────
 @asistencia_bp.route("/api/asistencias/justificacion/<int:idUsuario>", methods=["GET"])
 @jwt_required()
-def obtener_justificacion(idUsuario):
+def obtener_justificacion_usuario(idUsuario):
     service = AsistenciaService()
-    data, message, http_code = service.obtener_justificacion(idUsuario)
+    data, message, http_code = service.obtener_justificacion_usuario(idUsuario)
 
     if data is None:
         return error_response(message, http_code)

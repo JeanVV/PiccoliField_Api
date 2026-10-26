@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, time
 
 class AsistenciaRepository:
     def __init__(self, connection):
         self.connection = connection
 
+    # ── 1. RESUMEN DEL DÍA ───────────────────────────────────────────────────
     def get_resumen(self):
         cursor = self.connection.cursor()
         try:
@@ -24,26 +25,27 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
-    
-
-    def get_recientes(self, limite):
+    # ── 2. ASISTENCIAS RECIENTES ─────────────────────────────────────────────
+    def get_recientes(self, limite=10):
         cursor = self.connection.cursor()
         try:
             sql = """
                 SELECT 
                     a.idAsistencias,
-                    a.id_turno,
+                    a.idAsistencias AS id_turno,
                     a.tipo,
                     u.idUsuario,
                     u.nombres,
                     u.apePaterno,
                     u.apeMaterno,
-                    u.url_foto,
+                    u.url_foto AS foto_perfil,
                     s.sede,
                     a.estado,
                     DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo,
                     DATE_FORMAT(a.fecha_hora_servidor, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_servidor,
-                    a.minutos_tardanza
+                    a.minutos_tardanza,
+                    a.latitud,
+                    a.longitud
                 FROM ASISTENCIAS a
                 INNER JOIN USUARIOS u ON a.idUsuario = u.idUsuario
                 INNER JOIN SEDES s ON u.idSede = s.idSede
@@ -56,6 +58,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+    # ── 3. LISTA DE COLABORADORES CON ESTADO Y JUSTIFICACIÓN ─────────────────
     def get_colaboradores(self):
         cursor = self.connection.cursor()
         try:
@@ -65,15 +68,23 @@ class AsistenciaRepository:
                     u.nombres,
                     u.apePaterno,
                     u.apeMaterno,
-                    u.url_foto,
+                    u.url_foto AS foto_perfil,
                     s.sede,
+                    a.idAsistencias,
                     COALESCE(a.estado, 'SIN_REGISTRO') AS estado,
-                    DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo
+                    DATE_FORMAT(a.fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora_dispositivo,
+                    COALESCE(a.minutos_tardanza, 0) AS minutos_tardanza,
+                    a.latitud,
+                    a.longitud,
+                    j.motivo AS motivoJustificacion,
+                    j.descripcion AS justificacion,
+                    j.estado AS estadoJustificacion
                 FROM USUARIOS u
                 INNER JOIN SEDES s ON u.idSede = s.idSede
                 LEFT JOIN ASISTENCIAS a ON u.idUsuario = a.idUsuario 
                     AND DATE(a.fecha_hora_servidor) = CURDATE() 
                     AND a.tipo = 'INGRESO'
+                LEFT JOIN JUSTIFICACIONES j ON a.idAsistencias = j.idAsistencias
                 WHERE u.estado = 'ACTIVO' AND u.rol != 'ADMINISTRADOR'
                 ORDER BY a.fecha_hora_servidor DESC
             """
@@ -82,12 +93,13 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+    # ── 4. HISTORIAL DE TURNOS DE UN USUARIO ─────────────────────────────────
     def get_historial(self, idUsuario):
         cursor = self.connection.cursor()
         try:
             sql = """
                 SELECT 
-                    id_turno,
+                    idAsistencias AS id_turno,
                     tipo,
                     DATE_FORMAT(fecha_hora_dispositivo, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_hora,
                     idUsuario
@@ -100,146 +112,150 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
-    def marcar_asistencia(self, id_usuario, tipo, fecha_hora_dispositivo=None, latitud=None, longitud=None):
-            cursor = self.connection.cursor()
-            try:
-                if not fecha_hora_dispositivo:
-                    fecha_hora_dispositivo = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                # Cálculo de tardanza si es INGRESO (Horario estándar 09:00 AM, tolerancia 09:15 AM)
-                estado = "A_TIEMPO"
-                minutos_tardanza = 0
-                if tipo == "INGRESO":
-                    try:
-                        dt = datetime.strptime(fecha_hora_dispositivo, "%Y-%m-%d %H:%M:%S")
-                    except Exception:
-                        dt = datetime.now()
-                    hora_limite = dt.replace(hour=9, minute=15, second=0, microsecond=0)
-                    hora_inicio = dt.replace(hour=9, minute=0, second=0, microsecond=0)
-                    if dt > hora_limite:
-                        estado = "TARDANZA"
-                        minutos_tardanza = int((dt - hora_inicio).total_seconds() // 60)
-                    else:
-                        estado = "A_TIEMPO"
-                        minutos_tardanza = 0
-                # Detección dinámica de columnas existentes en ASISTENCIAS para evitar errores
-                cursor.execute("DESCRIBE ASISTENCIAS")
-                filas = cursor.fetchall()
-                columnas = [f["Field"] if isinstance(f, dict) else f[0] for f in filas]
-                campos = ["idUsuario", "tipo", "fecha_hora_servidor"]
-                valores = [id_usuario, tipo, datetime.now().strftime("%Y-%m-%d %H:%M:%S")]
-                placeholders = ["%s", "%s", "%s"]
-                if "fecha_hora_dispositivo" in columnas:
-                    campos.append("fecha_hora_dispositivo")
-                    valores.append(fecha_hora_dispositivo)
-                    placeholders.append("%s")
-                if "estado" in columnas:
-                    campos.append("estado")
-                    valores.append(estado)
-                    placeholders.append("%s")
-                if "minutos_tardanza" in columnas:
-                    campos.append("minutos_tardanza")
-                    valores.append(minutos_tardanza)
-                    placeholders.append("%s")
-                if "id_turno" in columnas:
-                    campos.append("id_turno")
-                    valores.append(1)
-                    placeholders.append("%s")
-                if "latitud" in columnas and latitud is not None:
-                    campos.append("latitud")
-                    valores.append(latitud)
-                    placeholders.append("%s")
-                if "longitud" in columnas and longitud is not None:
-                    campos.append("longitud")
-                    valores.append(longitud)
-                    placeholders.append("%s")
-                sql = f"""
-                    INSERT INTO ASISTENCIAS ({", ".join(campos)})
-                    VALUES ({", ".join(placeholders)})
-                """
-                cursor.execute(sql, tuple(valores))
-                self.connection.commit()
-                nuevo_id = cursor.lastrowid
-                return {
-                    "idAsistencias": nuevo_id,
-                    "idUsuario": id_usuario,
-                    "tipo": tipo,
-                    "estado": estado,
-                    "minutosTardanza": minutos_tardanza,
-                    "fechaHora": fecha_hora_dispositivo
-                }
-            except Exception as e:
-                self.connection.rollback()
-                raise e
-            finally:
-                cursor.close()
+    # ── 5. MARCAR ASISTENCIA (INGRESO / SALIDA) ──────────────────────────────
+    def marcar_asistencia(self, id_usuario, tipo, latitud, longitud, fecha_hora_disp):
+        cursor = self.connection.cursor()
+        try:
+            # Parsear fecha y hora para calcular tardanza
+            dt_disp = self._parse_datetime(fecha_hora_disp)
+            
+            estado = 'A_TIEMPO'
+            minutos_tardanza = 0
 
-    def registrar_justificacion(self, id_usuario, motivo, descripcion, fecha=None):
-            cursor = self.connection.cursor()
-            try:
-                # Crea la tabla automáticamente si aún no existe en la base de datos
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS JUSTIFICACIONES (
-                        idJustificacion INT AUTO_INCREMENT PRIMARY KEY,
-                        idUsuario INT NOT NULL,
-                        motivo VARCHAR(150) NOT NULL,
-                        descripcion TEXT NOT NULL,
-                        fecha DATE NOT NULL,
-                        estado VARCHAR(50) DEFAULT 'ENVIADA',
-                        fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+            # Evaluación de tardanza solo para INGRESO
+            if tipo.upper() == 'INGRESO':
+                hora_limite = time(9, 15, 0)  # Horario laboral 09:00 con 15 min de tolerancia
+                hora_marcado = dt_disp.time()
+                if hora_marcado > hora_limite:
+                    estado = 'TARDANZA'
+                    diff = datetime.combine(datetime.today(), hora_marcado) - datetime.combine(datetime.today(), time(9, 0, 0))
+                    minutos_tardanza = int(diff.total_seconds() // 60)
+
+            sql = """
+                INSERT INTO ASISTENCIAS (
+                    tipo, 
+                    fecha_hora_dispositivo, 
+                    estado, 
+                    minutos_tardanza, 
+                    latitud, 
+                    longitud, 
+                    idUsuario
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (
+                tipo.upper(),
+                dt_disp.strftime('%Y-%m-%d %H:%M:%S'),
+                estado,
+                minutos_tardanza,
+                latitud,
+                longitud,
+                id_usuario
+            ))
+            self.connection.commit()
+            
+            return {
+                "idAsistencias": cursor.lastrowid,
+                "tipo": tipo.upper(),
+                "estado": estado,
+                "minutosTardanza": minutos_tardanza,
+                "fechaHora": dt_disp.strftime('%Y-%m-%d %H:%M:%S')
+            }
+        except Exception as e:
+            self.connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+
+    # ── 6. REGISTRAR JUSTIFICACIÓN ───────────────────────────────────────────
+    def registrar_justificacion(self, id_usuario, motivo, descripcion, fecha):
+        cursor = self.connection.cursor()
+        try:
+            # 1. Buscar si ya existe una asistencia para esa fecha
+            sql_buscar = """
+                SELECT idAsistencias 
+                FROM ASISTENCIAS 
+                WHERE idUsuario = %s AND DATE(fecha_hora_dispositivo) = %s
+                ORDER BY idAsistencias DESC LIMIT 1
+            """
+            cursor.execute(sql_buscar, (id_usuario, fecha))
+            asistencia = cursor.fetchone()
+
+            # 2. Si no marcó asistencia, se crea el registro previo de FALTA (cumpliendo FK idAsistencias NOT NULL)
+            if not asistencia:
+                sql_crear_asistencia = """
+                    INSERT INTO ASISTENCIAS (
+                        tipo, fecha_hora_dispositivo, estado, minutos_tardanza, 
+                        marcacion_observada, observacion, idUsuario
+                    ) VALUES (
+                        'INGRESO', CONCAT(%s, ' 09:00:00'), 'FALTA', 0, 
+                        1, 'Inasistencia con justificación', %s
                     )
-                """)
-                if not fecha:
-                    fecha = datetime.now().strftime("%Y-%m-%d")
-                sql = """
-                    INSERT INTO JUSTIFICACIONES (idUsuario, motivo, descripcion, fecha, estado, fecha_creacion)
-                    VALUES (%s, %s, %s, %s, 'ENVIADA', NOW())
                 """
-                cursor.execute(sql, (id_usuario, motivo, descripcion, fecha))
-                self.connection.commit()
-                return {
-                    "idJustificacion": cursor.lastrowid,
-                    "idUsuario": id_usuario,
-                    "motivo": motivo,
-                    "descripcion": descripcion,
-                    "fecha": str(fecha),
-                    "estado": "ENVIADA"
-                }
-            except Exception as e:
-                self.connection.rollback()
-                raise e
-            finally:
-                cursor.close()
+                cursor.execute(sql_crear_asistencia, (fecha, id_usuario))
+                id_asistencia = cursor.lastrowid
+            else:
+                id_asistencia = asistencia.get("idAsistencias") if isinstance(asistencia, dict) else asistencia[0]
 
+            # 3. Insertar o actualizar justificación (evitando duplicado en UNIQUE idAsistencias)
+            sql_check_just = "SELECT idJustificacion FROM JUSTIFICACIONES WHERE idAsistencias = %s"
+            cursor.execute(sql_check_just, (id_asistencia,))
+            existe_just = cursor.fetchone()
+
+            if existe_just:
+                sql_upsert = """
+                    UPDATE JUSTIFICACIONES 
+                    SET motivo = %s, descripcion = %s, estado = 'PENDIENTE', fecha_registro = CURRENT_TIMESTAMP
+                    WHERE idAsistencias = %s
+                """
+                cursor.execute(sql_upsert, (motivo, descripcion, id_asistencia))
+            else:
+                sql_upsert = """
+                    INSERT INTO JUSTIFICACIONES (motivo, descripcion, estado, idAsistencias, idUsuario)
+                    VALUES (%s, %s, 'PENDIENTE', %s, %s)
+                """
+                cursor.execute(sql_upsert, (motivo, descripcion, id_asistencia, id_usuario))
+
+            self.connection.commit()
+            return {"idAsistencias": id_asistencia, "idUsuario": id_usuario, "estado": "ENVIADA"}
+        except Exception as e:
+            self.connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+
+    # ── 7. OBTENER ÚLTIMA JUSTIFICACIÓN DE UN USUARIO ────────────────────────
     def get_justificacion_usuario(self, id_usuario):
-            cursor = self.connection.cursor()
-            try:
-                cursor.execute("""
-                    CREATE TABLE IF NOT EXISTS JUSTIFICACIONES (
-                        idJustificacion INT AUTO_INCREMENT PRIMARY KEY,
-                        idUsuario INT NOT NULL,
-                        motivo VARCHAR(150) NOT NULL,
-                        descripcion TEXT NOT NULL,
-                        fecha DATE NOT NULL,
-                        estado VARCHAR(50) DEFAULT 'ENVIADA',
-                        fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                """)
-                sql = """
-                    SELECT 
-                        idJustificacion,
-                        idUsuario,
-                        motivo AS motivoJustificacion,
-                        descripcion AS justificacion,
-                        DATE_FORMAT(fecha, '%Y-%m-%d') AS fechaJustificacion,
-                        estado AS estadoJustificacion
-                    FROM JUSTIFICACIONES
-                    WHERE idUsuario = %s
-                    ORDER BY idJustificacion DESC
-                    LIMIT 1
-                """
-                cursor.execute(sql, (id_usuario,))
-                return cursor.fetchone()
-            finally:
-                cursor.close()
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    j.idJustificacion,
+                    j.motivo,
+                    j.motivo AS motivoJustificacion,
+                    j.descripcion,
+                    j.descripcion AS justificacion,
+                    j.estado,
+                    j.estado AS estadoJustificacion,
+                    DATE_FORMAT(j.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    DATE_FORMAT(j.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fechaJustificacion,
+                    j.idAsistencias,
+                    j.idUsuario
+                FROM JUSTIFICACIONES j
+                WHERE j.idUsuario = %s
+                ORDER BY j.fecha_registro DESC
+                LIMIT 1
+            """
+            cursor.execute(sql, (id_usuario,))
+            return cursor.fetchone()
+        finally:
+            cursor.close()
 
-                
+    def _parse_datetime(self, valor_str):
+        if not valor_str:
+            return datetime.now()
+        for formato in ('%Y-%m-%d %H:%M:%S', '%Y-%m-%d'):
+            try:
+                return datetime.strptime(str(valor_str).strip(), formato)
+            except ValueError:
+                pass
+        return datetime.now()
