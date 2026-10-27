@@ -19,3 +19,7 @@ class Config:
         "PROFILE_PHOTO_DIR",
         os.path.join(BASE_DIR, "uploads", "perfiles")
     )
+    PRODUCT_PHOTO_DIR = os.getenv(
+        "PRODUCT_PHOTO_DIR",
+        os.path.join(BASE_DIR, "uploads", "productos")
+    )

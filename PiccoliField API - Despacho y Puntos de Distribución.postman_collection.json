@@ -404,6 +404,135 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Listar impulsadores activos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/impulsadores",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/impulsadores/8/foto",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "foto"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de producto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/productos/1/foto",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "productos",
+                "1",
+                "foto"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle punto de venta (tipo VENTA)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/puntos-venta/1",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de impulsadores por punto de venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/puntos-venta/1/historial",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "historial"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar impulsador a punto de venta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"idUsuario\": 8,\n    \"idPuntosVenta\": 1,\n    \"motivo\": \"Reasignación de punto de venta por rotación\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/supervision/reasignar-impulsador",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "reasignar-impulsador"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }

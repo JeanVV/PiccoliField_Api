@@ -31,6 +31,13 @@ def create_app():
             "status": True,
         }, 200
 
+    @app.get("/uploads/<path:filename>")
+    def servir_archivo(filename):
+        import os
+        from flask import send_from_directory
+        from config import BASE_DIR
+        return send_from_directory(os.path.join(BASE_DIR, "uploads"), filename)
+
     return app
 
 
