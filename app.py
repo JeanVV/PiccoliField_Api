@@ -7,6 +7,7 @@ from routes.auth_routes import auth_bp
 from routes.usuario_routes import usuario_bp
 from routes.punto_venta_routes import punto_venta_bp
 from routes.supervision_routes import supervision_bp
+from routes.impulsador_routes import impulsador_bp
 
 
 def create_app():
@@ -22,6 +23,7 @@ def create_app():
     app.register_blueprint(asistencia_bp)
     app.register_blueprint(punto_venta_bp)
     app.register_blueprint(supervision_bp)
+    app.register_blueprint(impulsador_bp)
 
     @app.get("/")
     def inicio():

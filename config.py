@@ -23,3 +23,7 @@ class Config:
         "PRODUCT_PHOTO_DIR",
         os.path.join(BASE_DIR, "uploads", "productos")
     )
+    EVIDENCIAS_DIR = os.getenv(
+        "EVIDENCIAS_DIR",
+        os.path.join(BASE_DIR, "uploads", "evidencias")
+    )

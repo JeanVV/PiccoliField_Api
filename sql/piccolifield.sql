@@ -194,7 +194,9 @@ CREATE TABLE ALERTAS_STOCK (
 CREATE TABLE PDV_PRODUCTOS (
     idPuntosVenta INT NOT NULL,
     idProductos INT NOT NULL,
+    stock_actual INT NOT NULL DEFAULT 0,
     stock_minimo INT NOT NULL DEFAULT 0,
+    precio DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     PRIMARY KEY (idPuntosVenta, idProductos),
     FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta),
     FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos)
