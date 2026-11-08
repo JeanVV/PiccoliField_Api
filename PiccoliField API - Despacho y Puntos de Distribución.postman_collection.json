@@ -533,6 +533,80 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Rendimiento histórico de colaborador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/vendedores/8/rendimiento-historico",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "rendimiento-historico"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de asignaciones de colaborador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/vendedores/8/historial-asignaciones",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "historial-asignaciones"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar colaborador desde vista vendedor",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"idPuntosVenta\": 1,\n    \"motivo\": \"Reasignación por rotación estratégica\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/supervision/vendedores/8/reasignar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "reasignar"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }

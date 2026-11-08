@@ -64,11 +64,11 @@ class SupervisionService:
         finally:
             connection.close()
 
-    def listar_puntos_venta(self):
+    def listar_puntos_venta(self, estado=None):
         connection = get_connection()
         try:
             repo = SupervisionRepository(connection)
-            data = repo.listar_puntos_venta()
+            data = repo.listar_puntos_venta(estado=estado)
             
             if data is None:
                 return None, "Error interno al obtener puntos de venta", 500
@@ -209,5 +209,29 @@ class SupervisionService:
         except Exception as e:
             print(f"Error en listar_alertas: {e}")
             return None, "Error interno", 500
+        finally:
+            connection.close()
+
+    def obtener_rendimiento_historico(self, idUsuario, anio=None):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data, message, http_code = repo.obtener_rendimiento_historico(idUsuario=idUsuario, anio=anio)
+            return data, message, http_code
+        except Exception as e:
+            print(f"Error en servicio obtener_rendimiento_historico: {e}")
+            return None, "Error interno al obtener rendimiento histórico", 500
+        finally:
+            connection.close()
+
+    def obtener_historial_asignaciones_usuario(self, idUsuario):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data, message, http_code = repo.obtener_historial_asignaciones_usuario(idUsuario=idUsuario)
+            return data, message, http_code
+        except Exception as e:
+            print(f"Error en servicio obtener_historial_asignaciones_usuario: {e}")
+            return None, "Error interno al obtener historial de asignaciones", 500
         finally:
             connection.close()

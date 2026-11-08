@@ -42,6 +42,33 @@ def detalle_vendedor(idUsuario):
     return success_response(data, message, http_code)
 
 
+@supervision_bp.route("/api/supervision/vendedores/<int:idUsuario>/rendimiento-historico", methods=["GET"])
+@supervision_bp.route("/api/supervision/impulsadores/<int:idUsuario>/rendimiento-historico", methods=["GET"])
+@supervision_bp.route("/api/supervision/personal/<int:idUsuario>/rendimiento-historico", methods=["GET"])
+@jwt_required()
+def rendimiento_historico(idUsuario):
+    anio = request.args.get("anio", type=int)
+    service = SupervisionService()
+    data, message, http_code = service.obtener_rendimiento_historico(idUsuario=idUsuario, anio=anio)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/vendedores/<int:idUsuario>/historial-asignaciones", methods=["GET"])
+@supervision_bp.route("/api/supervision/impulsadores/<int:idUsuario>/historial-asignaciones", methods=["GET"])
+@supervision_bp.route("/api/supervision/personal/<int:idUsuario>/historial-asignaciones", methods=["GET"])
+@jwt_required()
+def historial_asignaciones_usuario(idUsuario):
+    service = SupervisionService()
+    data, message, http_code = service.obtener_historial_asignaciones_usuario(idUsuario=idUsuario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
 @supervision_bp.route("/api/supervision/impulsadores", methods=["GET"])
 @jwt_required()
 def listar_impulsadores():
@@ -80,8 +107,9 @@ def obtener_foto_producto(idProductos):
 @supervision_bp.route("/api/supervision/puntos-venta", methods=["GET"])
 @jwt_required()
 def listar_puntos_venta():
+    estado = request.args.get("estado")
     service = SupervisionService()
-    data, message, http_code = service.listar_puntos_venta()
+    data, message, http_code = service.listar_puntos_venta(estado=estado)
     
     if data is None:
         return error_response(message, http_code)
@@ -123,6 +151,40 @@ def reasignar_impulsador():
 
     if not idUsuario or not idPuntosVenta:
         return error_response("idUsuario e idPuntosVenta son obligatorios", 400)
+
+    try:
+        idUsuario = int(idUsuario)
+        idPuntosVenta = int(idPuntosVenta)
+        idUsuarioRegistra = int(idUsuarioRegistra)
+    except (ValueError, TypeError):
+        return error_response("idUsuario e idPuntosVenta deben ser números enteros", 400)
+
+    service = SupervisionService()
+    data, message, http_code = service.reasignar_impulsador(
+        idPuntosVenta=idPuntosVenta,
+        idUsuario=idUsuario,
+        idUsuarioRegistra=idUsuarioRegistra,
+        motivo=motivo
+    )
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/vendedores/<int:idUsuario>/reasignar", methods=["POST", "PUT"])
+@supervision_bp.route("/api/supervision/impulsadores/<int:idUsuario>/reasignar", methods=["POST", "PUT"])
+@supervision_bp.route("/api/supervision/personal/<int:idUsuario>/reasignar", methods=["POST", "PUT"])
+@jwt_required()
+def reasignar_vendedor(idUsuario):
+    idUsuarioRegistra = get_jwt_identity()
+    datos = request.get_json(silent=True) or {}
+
+    idPuntosVenta = datos.get("idPuntosVenta")
+    motivo = datos.get("motivo")
+
+    if not idPuntosVenta:
+        return error_response("idPuntosVenta es obligatorio", 400)
 
     try:
         idUsuario = int(idUsuario)
