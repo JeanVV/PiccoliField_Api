@@ -319,3 +319,20 @@ CREATE TABLE CONFIGURACION (
     idUsuario INT NULL,
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
+
+-- 22. HISTORIAL DE DESEMPEÑO MENSUAL
+CREATE TABLE DESEMPENIO_HISTORICO (
+    idDesempenio INT AUTO_INCREMENT PRIMARY KEY,
+    anio INT NOT NULL,
+    mes INT NOT NULL,
+    meta_ventas_asignada DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    total_ventas_logradas DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    porcentaje_cumplimiento DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
+    total_asistencias INT NOT NULL DEFAULT 0,
+    total_tardanzas INT NOT NULL DEFAULT 0,
+    total_faltas INT NOT NULL DEFAULT 0,
+    fecha_cierre DATETIME NULL,
+    idUsuario INT NOT NULL,
+    UNIQUE KEY uq_usuario_desempenio (idUsuario, anio, mes),
+    FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
+);

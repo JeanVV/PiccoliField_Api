@@ -516,66 +516,69 @@ class SupervisionRepository:
 
             meta_base = float(usuario.get("meta_asignada") or 0.0)
 
-            # 2. Obtener avance por meses (histórico de ventas agrupadas)
-            if anio:
-                sql_meses = """
-                    SELECT 
-                        YEAR(v.fecha) AS anio,
-                        MONTH(v.fecha) AS mes,
-                        COALESCE(SUM(v.total), 0) AS monto_vendido,
-                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
-                        COUNT(DISTINCT v.idVenta) AS cantidad_ventas
-                    FROM VENTAS v
-                    LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
-                    WHERE v.idUsuario = %s AND YEAR(v.fecha) = %s
-                    GROUP BY YEAR(v.fecha), MONTH(v.fecha)
-                    ORDER BY anio DESC, mes DESC
-                """
-                cursor.execute(sql_meses, (idUsuario, anio))
-            else:
-                sql_meses = """
-                    SELECT 
-                        YEAR(v.fecha) AS anio,
-                        MONTH(v.fecha) AS mes,
-                        COALESCE(SUM(v.total), 0) AS monto_vendido,
-                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
-                        COUNT(DISTINCT v.idVenta) AS cantidad_ventas
-                    FROM VENTAS v
-                    LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
-                    WHERE v.idUsuario = %s
-                    GROUP BY YEAR(v.fecha), MONTH(v.fecha)
-                    ORDER BY anio DESC, mes DESC
-                """
-                cursor.execute(sql_meses, (idUsuario,))
-
-            rows_meses = cursor.fetchall()
+            # 2. Obtener avance por meses
+            # → Meses cerrados: desde DESEMPENIO_HISTORICO (ya calculados al cierre)
+            # → Mes actual en curso: desde VENTAS y ASISTENCIAS en tiempo real
 
             MESES_ES = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
                 5: "Mayo", 6: "Junio", 7: "Julio", 8: "Agosto",
                 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
             }
-
-            periodos_existentes = {f"{int(r['anio'])}-{int(r['mes']):02d}" for r in rows_meses}
             periodo_actual = f"{hoy.year}-{hoy.month:02d}"
+
+            # 2a. Meses cerrados desde DESEMPENIO_HISTORICO
+            if anio:
+                sql_historico = """
+                    SELECT
+                        dh.anio,
+                        dh.mes,
+                        dh.meta_ventas_asignada,
+                        dh.total_ventas_logradas  AS monto_vendido,
+                        dh.porcentaje_cumplimiento,
+                        dh.total_asistencias,
+                        dh.total_tardanzas,
+                        dh.total_faltas,
+                        DATE_FORMAT(dh.fecha_cierre, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_cierre
+                    FROM DESEMPENIO_HISTORICO dh
+                    WHERE dh.idUsuario = %s AND dh.anio = %s
+                    ORDER BY dh.anio DESC, dh.mes DESC
+                """
+                cursor.execute(sql_historico, (idUsuario, anio))
+            else:
+                sql_historico = """
+                    SELECT
+                        dh.anio,
+                        dh.mes,
+                        dh.meta_ventas_asignada,
+                        dh.total_ventas_logradas  AS monto_vendido,
+                        dh.porcentaje_cumplimiento,
+                        dh.total_asistencias,
+                        dh.total_tardanzas,
+                        dh.total_faltas,
+                        DATE_FORMAT(dh.fecha_cierre, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_cierre
+                    FROM DESEMPENIO_HISTORICO dh
+                    WHERE dh.idUsuario = %s
+                    ORDER BY dh.anio DESC, dh.mes DESC
+                """
+                cursor.execute(sql_historico, (idUsuario,))
+
+            rows_historico = cursor.fetchall()
 
             avance_mensual = []
             meses_cumplidos_count = 0
-            for r in rows_meses:
+            periodos_historico = set()
+
+            for r in rows_historico:
                 anio_val = int(r["anio"])
                 mes_val = int(r["mes"])
                 monto_val = float(r["monto_vendido"] or 0.0)
-                unidades_val = int(r["unidades_vendidas"] or 0)
-                ventas_val = int(r["cantidad_ventas"] or 0)
-
-                porcentaje = round((monto_val / meta_base) * 100, 2) if meta_base > 0 else 0.0
-                cumplio = (monto_val >= meta_base) if meta_base > 0 else False
-                diferencia = round(monto_val - meta_base, 2)
-
-                if anio_val == hoy.year and mes_val == hoy.month:
-                    estado_meta = "CUMPLIDA" if cumplio else "EN_PROCESO"
-                else:
-                    estado_meta = "CUMPLIDA" if cumplio else "NO_CUMPLIDA"
+                meta_val = float(r["meta_ventas_asignada"] or 0.0)
+                porcentaje = float(r["porcentaje_cumplimiento"] or 0.0)
+                cumplio = (monto_val >= meta_val) if meta_val > 0 else False
+                diferencia = round(monto_val - meta_val, 2)
+                periodo = f"{anio_val}-{mes_val:02d}"
+                periodos_historico.add(periodo)
 
                 if cumplio:
                     meses_cumplidos_count += 1
@@ -584,37 +587,95 @@ class SupervisionRepository:
                     "anio": anio_val,
                     "mes": mes_val,
                     "mes_nombre": MESES_ES.get(mes_val, f"Mes {mes_val}"),
-                    "periodo": f"{anio_val}-{mes_val:02d}",
+                    "periodo": periodo,
                     "monto_vendido": monto_val,
-                    "unidades_vendidas": unidades_val,
-                    "cantidad_transacciones": ventas_val,
-                    "meta_mensual": meta_base,
+                    "unidades_vendidas": 0,
+                    "cantidad_transacciones": 0,
+                    "meta_mensual": meta_val,
                     "porcentaje_cumplimiento": porcentaje,
                     "cumplio_meta": cumplio,
                     "diferencia_meta": diferencia,
-                    "estado_meta": estado_meta
+                    "estado_meta": "CUMPLIDA" if cumplio else "NO_CUMPLIDA",
+                    "total_asistencias": int(r["total_asistencias"] or 0),
+                    "total_tardanzas": int(r["total_tardanzas"] or 0),
+                    "total_faltas": int(r["total_faltas"] or 0),
+                    "fecha_cierre": r["fecha_cierre"],
+                    "fuente": "historico"
                 })
 
-            # Si el mes actual no tiene ventas registradas y entra en el filtro de año, agregarlo para monitorear meta en curso
-            if (not anio or int(anio) == hoy.year) and periodo_actual not in periodos_existentes:
-                avance_mensual.insert(0, {
+            # 2b. Mes actual en tiempo real (solo si no está ya cerrado en DESEMPENIO_HISTORICO)
+            if (not anio or int(anio) == hoy.year) and periodo_actual not in periodos_historico:
+                # Ventas del mes actual
+                sql_ventas_actual = """
+                    SELECT
+                        COALESCE(SUM(v.total), 0)           AS monto_vendido,
+                        COALESCE(SUM(dv.cantidad), 0)        AS unidades_vendidas,
+                        COUNT(DISTINCT v.idVenta)            AS cantidad_ventas
+                    FROM VENTAS v
+                    LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
+                    WHERE v.idUsuario = %s
+                      AND YEAR(v.fecha) = %s
+                      AND MONTH(v.fecha) = %s
+                """
+                cursor.execute(sql_ventas_actual, (idUsuario, hoy.year, hoy.month))
+                row_v = cursor.fetchone()
+
+                # Asistencias del mes actual
+                sql_asist_actual = """
+                    SELECT
+                        COALESCE(SUM(estado = 'A_TIEMPO'), 0)  AS total_asistencias,
+                        COALESCE(SUM(estado = 'TARDANZA'), 0)  AS total_tardanzas,
+                        COALESCE(SUM(estado = 'FALTA'), 0)     AS total_faltas
+                    FROM ASISTENCIAS
+                    WHERE idUsuario = %s
+                      AND tipo = 'INGRESO'
+                      AND YEAR(fecha_hora_dispositivo) = %s
+                      AND MONTH(fecha_hora_dispositivo) = %s
+                """
+                cursor.execute(sql_asist_actual, (idUsuario, hoy.year, hoy.month))
+                row_a = cursor.fetchone()
+
+                monto_actual = float(row_v["monto_vendido"] or 0.0) if row_v else 0.0
+                unidades_actual = int(row_v["unidades_vendidas"] or 0) if row_v else 0
+                ventas_actual = int(row_v["cantidad_ventas"] or 0) if row_v else 0
+                asist_actual = int(row_a["total_asistencias"] or 0) if row_a else 0
+                tard_actual = int(row_a["total_tardanzas"] or 0) if row_a else 0
+                falt_actual = int(row_a["total_faltas"] or 0) if row_a else 0
+
+                porcentaje_actual = round((monto_actual / meta_base) * 100, 2) if meta_base > 0 else 0.0
+                cumplio_actual = (monto_actual >= meta_base) if meta_base > 0 else False
+                diferencia_actual = round(monto_actual - meta_base, 2)
+
+                if cumplio_actual:
+                    meses_cumplidos_count += 1
+
+                entrada_actual = {
                     "anio": hoy.year,
                     "mes": hoy.month,
                     "mes_nombre": MESES_ES.get(hoy.month, f"Mes {hoy.month}"),
                     "periodo": periodo_actual,
-                    "monto_vendido": 0.0,
-                    "unidades_vendidas": 0,
-                    "cantidad_transacciones": 0,
+                    "monto_vendido": monto_actual,
+                    "unidades_vendidas": unidades_actual,
+                    "cantidad_transacciones": ventas_actual,
                     "meta_mensual": meta_base,
-                    "porcentaje_cumplimiento": 0.0,
-                    "cumplio_meta": False,
-                    "diferencia_meta": -meta_base,
-                    "estado_meta": "EN_PROCESO"
-                })
+                    "porcentaje_cumplimiento": porcentaje_actual,
+                    "cumplio_meta": cumplio_actual,
+                    "diferencia_meta": diferencia_actual,
+                    "estado_meta": "CUMPLIDA" if cumplio_actual else "EN_PROCESO",
+                    "total_asistencias": asist_actual,
+                    "total_tardanzas": tard_actual,
+                    "total_faltas": falt_actual,
+                    "fecha_cierre": None,
+                    "fuente": "tiempo_real"
+                }
+                avance_mensual.insert(0, entrada_actual)
 
             total_monto_historico = round(sum(m["monto_vendido"] for m in avance_mensual), 2)
             total_unidades_historico = sum(m["unidades_vendidas"] for m in avance_mensual)
             total_transacciones_historico = sum(m["cantidad_transacciones"] for m in avance_mensual)
+            total_asistencias_historico = sum(m["total_asistencias"] for m in avance_mensual)
+            total_tardanzas_historico = sum(m["total_tardanzas"] for m in avance_mensual)
+            total_faltas_historico = sum(m["total_faltas"] for m in avance_mensual)
             total_meses = len(avance_mensual)
             tasa_exito = round((meses_cumplidos_count / total_meses) * 100, 2) if total_meses > 0 else 0.0
 
@@ -622,6 +683,9 @@ class SupervisionRepository:
                 "monto_total_historico": total_monto_historico,
                 "unidades_totales_historico": total_unidades_historico,
                 "total_transacciones_historico": total_transacciones_historico,
+                "total_asistencias_historico": total_asistencias_historico,
+                "total_tardanzas_historico": total_tardanzas_historico,
+                "total_faltas_historico": total_faltas_historico,
                 "meses_evaluados": total_meses,
                 "meses_meta_cumplida": meses_cumplidos_count,
                 "tasa_cumplimiento_metas": tasa_exito
