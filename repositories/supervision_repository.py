@@ -704,7 +704,6 @@ class SupervisionRepository:
                 "trabajador": {
                     "idUsuario": usuario["idUsuario"],
                     "nombre": usuario["nombre_completo"],
-                    "nombre_corto": usuario["nombre_corto"],
                     "correo": usuario["correo"],
                     "rol": usuario["rol"],
                     "url_foto": usuario["url_foto"],
