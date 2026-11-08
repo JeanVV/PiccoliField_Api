@@ -159,31 +159,50 @@ class SupervisionRepository:
     def listar_puntos_venta(self, estado=None):
         cursor = self.connection.cursor()
         try:
-            query = """
-                SELECT 
-                    pv.idPuntosVenta,
-                    pv.idPuntosVenta AS id, 
-                    pv.codigo,
-                    pv.puntoVenta,
-                    pv.puntoVenta AS nombre, 
-                    pv.direccion, 
-                    pv.estado,
-                    pv.tipo,
-                    d.distrito,
-                    pv.idUsuario AS idImpulsador,
-                    CONCAT(u.nombres, ' ', u.apePaterno) AS promotor_asignado,
-                    u.url_foto AS impulsador_foto
-                FROM PUNTOS_VENTA pv
-                INNER JOIN DISTRITO d ON pv.idDistrito = d.idDistrito
-                LEFT JOIN USUARIOS u ON pv.idUsuario = u.idUsuario
-                WHERE pv.tipo = 'VENTA'
-            """
-            params = []
             if estado:
-                query += " AND pv.estado = %s"
-                params.append(estado)
-            query += " ORDER BY pv.puntoVenta ASC"
-            cursor.execute(query, tuple(params))
+                query = """
+                    SELECT 
+                        pv.idPuntosVenta,
+                        pv.idPuntosVenta AS id, 
+                        pv.codigo,
+                        pv.puntoVenta,
+                        pv.puntoVenta AS nombre, 
+                        pv.direccion, 
+                        pv.estado,
+                        pv.tipo,
+                        d.distrito,
+                        pv.idUsuario AS idImpulsador,
+                        CONCAT(u.nombres, ' ', u.apePaterno) AS promotor_asignado,
+                        u.url_foto AS impulsador_foto
+                    FROM PUNTOS_VENTA pv
+                    INNER JOIN DISTRITO d ON pv.idDistrito = d.idDistrito
+                    LEFT JOIN USUARIOS u ON pv.idUsuario = u.idUsuario
+                    WHERE pv.tipo = 'VENTA' AND pv.estado = %s
+                    ORDER BY pv.puntoVenta ASC
+                """
+                cursor.execute(query, (estado,))
+            else:
+                query = """
+                    SELECT 
+                        pv.idPuntosVenta,
+                        pv.idPuntosVenta AS id, 
+                        pv.codigo,
+                        pv.puntoVenta,
+                        pv.puntoVenta AS nombre, 
+                        pv.direccion, 
+                        pv.estado,
+                        pv.tipo,
+                        d.distrito,
+                        pv.idUsuario AS idImpulsador,
+                        CONCAT(u.nombres, ' ', u.apePaterno) AS promotor_asignado,
+                        u.url_foto AS impulsador_foto
+                    FROM PUNTOS_VENTA pv
+                    INNER JOIN DISTRITO d ON pv.idDistrito = d.idDistrito
+                    LEFT JOIN USUARIOS u ON pv.idUsuario = u.idUsuario
+                    WHERE pv.tipo = 'VENTA'
+                    ORDER BY pv.puntoVenta ASC
+                """
+                cursor.execute(query)
             return cursor.fetchall()
         except Exception as e:
             print(f"Error en listar_puntos_venta: {e}")
@@ -299,16 +318,19 @@ class SupervisionRepository:
     def reasignar_impulsador(self, idPuntosVenta, idUsuario, idUsuarioRegistra, motivo=None):
         cursor = self.connection.cursor()
         try:
-            # 1. Validar punto de venta
+            # 1. Validar punto de venta (permite buscar por idPuntosVenta o por código)
             cursor.execute(
-                "SELECT idPuntosVenta, puntoVenta, estado, tipo, idUsuario FROM PUNTOS_VENTA WHERE idPuntosVenta = %s",
-                (idPuntosVenta,)
+                "SELECT idPuntosVenta, codigo, puntoVenta, estado, tipo, idUsuario FROM PUNTOS_VENTA WHERE idPuntosVenta = %s OR codigo = %s LIMIT 1",
+                (idPuntosVenta, str(idPuntosVenta))
             )
             pdv = cursor.fetchone()
             if not pdv:
                 return None, "Punto de venta no encontrado", 404
+            
+            idPuntosVenta = pdv['idPuntosVenta']
+
             if pdv['tipo'] != 'VENTA':
-                return None, "El punto de venta debe ser de tipo VENTA", 400
+                return None, f"El punto de venta debe ser de tipo VENTA (actual: {pdv['tipo']})", 400
             if pdv['estado'] != 'ACTIVO':
                 return None, "El punto de venta no está ACTIVO", 400
 
@@ -322,11 +344,11 @@ class SupervisionRepository:
                 return None, "Impulsador no encontrado", 404
             if usuario['estado'] != 'ACTIVO':
                 return None, "El impulsador no está ACTIVO", 400
-            if usuario['rol'] not in ('IMPULSADOR', 'PROMOTOR', 'VENDEDOR'):
+            if usuario['rol'] not in ('IMPULSADOR', 'PROMOTOR', 'VENDEDOR', 'TRABAJADOR'):
                 return None, f"El usuario tiene rol {usuario['rol']}, debe ser IMPULSADOR o PROMOTOR", 400
 
             # Si ya está asignado al mismo PDV
-            if pdv['idUsuario'] == idUsuario:
+            if pdv['idUsuario'] is not None and pdv['idUsuario'] == idUsuario:
                 return None, f"{usuario['nombre']} ya se encuentra actualmente asignado a {pdv['puntoVenta']}", 400
 
             # 3. Validar registrador
@@ -350,12 +372,12 @@ class SupervisionRepository:
             """, (idUsuario,))
 
             # c) Actualizar PUNTOS_VENTA
-            # Si este impulsador estaba asociado a otro punto de venta en PUNTOS_VENTA, reasignarlo para no duplicar
-            cursor.execute("SELECT idPuntosVenta FROM PUNTOS_VENTA WHERE idUsuario = %s AND idPuntosVenta != %s", (idUsuario, idPuntosVenta))
-            pdvs_previos = cursor.fetchall()
-            for pdv_previo in pdvs_previos:
-                nuevo_encargado = pdv['idUsuario'] if pdv['idUsuario'] != idUsuario else idUsuarioRegistra
-                cursor.execute("UPDATE PUNTOS_VENTA SET idUsuario = %s WHERE idPuntosVenta = %s", (nuevo_encargado, pdv_previo['idPuntosVenta']))
+            # Liberar puntos de venta anteriores de tipo VENTA donde estaba asignado este impulsador
+            cursor.execute("""
+                UPDATE PUNTOS_VENTA 
+                SET idUsuario = NULL 
+                WHERE idUsuario = %s AND idPuntosVenta != %s AND tipo = 'VENTA'
+            """, (idUsuario, idPuntosVenta))
 
             cursor.execute("""
                 UPDATE PUNTOS_VENTA 
@@ -473,7 +495,6 @@ class SupervisionRepository:
                 SELECT 
                     u.idUsuario,
                     CONCAT(u.nombres, ' ', u.apePaterno, ' ', u.apeMaterno) AS nombre_completo,
-                    CONCAT(u.nombres, ' ', u.apePaterno) AS nombre_corto,
                     u.correo,
                     u.rol,
                     u.url_foto,
@@ -496,25 +517,38 @@ class SupervisionRepository:
             meta_base = float(usuario.get("meta_asignada") or 0.0)
 
             # 2. Obtener avance por meses (histórico de ventas agrupadas)
-            sql_meses = """
-                SELECT 
-                    YEAR(v.fecha) AS anio,
-                    MONTH(v.fecha) AS mes,
-                    COALESCE(SUM(v.total), 0) AS monto_vendido,
-                    COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
-                    COUNT(DISTINCT v.idVenta) AS cantidad_ventas
-                FROM VENTAS v
-                LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
-                WHERE v.idUsuario = %s
-            """
-            params_meses = [idUsuario]
             if anio:
-                sql_meses += " AND YEAR(v.fecha) = %s"
-                params_meses.append(int(anio))
+                sql_meses = """
+                    SELECT 
+                        YEAR(v.fecha) AS anio,
+                        MONTH(v.fecha) AS mes,
+                        COALESCE(SUM(v.total), 0) AS monto_vendido,
+                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                        COUNT(DISTINCT v.idVenta) AS cantidad_ventas
+                    FROM VENTAS v
+                    LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
+                    WHERE v.idUsuario = %s AND YEAR(v.fecha) = %s
+                    GROUP BY YEAR(v.fecha), MONTH(v.fecha)
+                    ORDER BY anio DESC, mes DESC
+                """
+                cursor.execute(sql_meses, (idUsuario, anio))
+            else:
+                sql_meses = """
+                    SELECT 
+                        YEAR(v.fecha) AS anio,
+                        MONTH(v.fecha) AS mes,
+                        COALESCE(SUM(v.total), 0) AS monto_vendido,
+                        COALESCE(SUM(dv.cantidad), 0) AS unidades_vendidas,
+                        COUNT(DISTINCT v.idVenta) AS cantidad_ventas
+                    FROM VENTAS v
+                    LEFT JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
+                    WHERE v.idUsuario = %s
+                    GROUP BY YEAR(v.fecha), MONTH(v.fecha)
+                    ORDER BY anio DESC, mes DESC
+                """
+                cursor.execute(sql_meses, (idUsuario,))
 
-            sql_meses += " GROUP BY YEAR(v.fecha), MONTH(v.fecha) ORDER BY anio DESC, mes DESC"
-            cursor.execute(sql_meses, tuple(params_meses))
-            rows_meses = cursor.fetchall() or []
+            rows_meses = cursor.fetchall()
 
             MESES_ES = {
                 1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril",
@@ -524,16 +558,6 @@ class SupervisionRepository:
 
             periodos_existentes = {f"{int(r['anio'])}-{int(r['mes']):02d}" for r in rows_meses}
             periodo_actual = f"{hoy.year}-{hoy.month:02d}"
-
-            # Si el mes actual no tiene ventas registradas y entra en el filtro de año, agregarlo para monitorear meta en curso
-            if (not anio or int(anio) == hoy.year) and periodo_actual not in periodos_existentes:
-                rows_meses.insert(0, {
-                    "anio": hoy.year,
-                    "mes": hoy.month,
-                    "monto_vendido": 0.0,
-                    "unidades_vendidas": 0,
-                    "cantidad_ventas": 0
-                })
 
             avance_mensual = []
             meses_cumplidos_count = 0
@@ -569,6 +593,23 @@ class SupervisionRepository:
                     "cumplio_meta": cumplio,
                     "diferencia_meta": diferencia,
                     "estado_meta": estado_meta
+                })
+
+            # Si el mes actual no tiene ventas registradas y entra en el filtro de año, agregarlo para monitorear meta en curso
+            if (not anio or int(anio) == hoy.year) and periodo_actual not in periodos_existentes:
+                avance_mensual.insert(0, {
+                    "anio": hoy.year,
+                    "mes": hoy.month,
+                    "mes_nombre": MESES_ES.get(hoy.month, f"Mes {hoy.month}"),
+                    "periodo": periodo_actual,
+                    "monto_vendido": 0.0,
+                    "unidades_vendidas": 0,
+                    "cantidad_transacciones": 0,
+                    "meta_mensual": meta_base,
+                    "porcentaje_cumplimiento": 0.0,
+                    "cumplio_meta": False,
+                    "diferencia_meta": -meta_base,
+                    "estado_meta": "EN_PROCESO"
                 })
 
             total_monto_historico = round(sum(m["monto_vendido"] for m in avance_mensual), 2)
@@ -615,7 +656,7 @@ class SupervisionRepository:
                 ORDER BY (h.fecha_fin IS NULL) DESC, h.fecha_inicio DESC, h.idHistorial DESC
             """
             cursor.execute(sql_historial, (idUsuario,))
-            historial_asig = cursor.fetchall() or []
+            historial_asig = list(cursor.fetchall())
 
             # Si aún no tiene registros en HISTORIAL_ASIGNACIONES pero tiene punto de venta asignado
             if not historial_asig and usuario.get("idPuntosVentaActual"):

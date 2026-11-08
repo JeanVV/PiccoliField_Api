@@ -146,7 +146,7 @@ def reasignar_impulsador():
     datos = request.get_json(silent=True) or {}
 
     idUsuario = datos.get("idUsuario")
-    idPuntosVenta = datos.get("idPuntosVenta")
+    idPuntosVenta = datos.get("idPuntosVenta") or datos.get("idPuntoVenta") or datos.get("id") or datos.get("codigo")
     motivo = datos.get("motivo")
 
     if not idUsuario or not idPuntosVenta:
@@ -154,10 +154,11 @@ def reasignar_impulsador():
 
     try:
         idUsuario = int(idUsuario)
-        idPuntosVenta = int(idPuntosVenta)
         idUsuarioRegistra = int(idUsuarioRegistra)
+        if str(idPuntosVenta).isdigit():
+            idPuntosVenta = int(idPuntosVenta)
     except (ValueError, TypeError):
-        return error_response("idUsuario e idPuntosVenta deben ser números enteros", 400)
+        return error_response("idUsuario e idUsuarioRegistra deben ser números enteros", 400)
 
     service = SupervisionService()
     data, message, http_code = service.reasignar_impulsador(
@@ -180,7 +181,7 @@ def reasignar_vendedor(idUsuario):
     idUsuarioRegistra = get_jwt_identity()
     datos = request.get_json(silent=True) or {}
 
-    idPuntosVenta = datos.get("idPuntosVenta")
+    idPuntosVenta = datos.get("idPuntosVenta") or datos.get("idPuntoVenta") or datos.get("id") or datos.get("codigo")
     motivo = datos.get("motivo")
 
     if not idPuntosVenta:
@@ -188,10 +189,11 @@ def reasignar_vendedor(idUsuario):
 
     try:
         idUsuario = int(idUsuario)
-        idPuntosVenta = int(idPuntosVenta)
         idUsuarioRegistra = int(idUsuarioRegistra)
+        if str(idPuntosVenta).isdigit():
+            idPuntosVenta = int(idPuntosVenta)
     except (ValueError, TypeError):
-        return error_response("idUsuario e idPuntosVenta deben ser números enteros", 400)
+        return error_response("idUsuario e idUsuarioRegistra deben ser números enteros", 400)
 
     service = SupervisionService()
     data, message, http_code = service.reasignar_impulsador(
