@@ -388,6 +388,93 @@
           "response": []
         },
         {
+          "name": "Marcar alerta como atendida",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"comentario\": \"Stock repuesto desde almacén central\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/supervision/alertas/1/atender",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "atender"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar alerta como ignorada",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"comentario\": \"Alerta desestimada por fin de campaña\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/supervision/alertas/1/ignorar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "ignorar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar estado de alerta (general)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"ATENDIDA\",\n    \"comentario\": \"Alerta resuelta\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/supervision/alertas/1/estado",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "estado"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Lista de alertas",
           "request": {
             "method": "GET",

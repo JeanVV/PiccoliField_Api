@@ -127,11 +127,18 @@ class SupervisionRepository:
             sql = """
                 SELECT 
                     a.idAlertas,
+                    a.idAlertas AS idAlerta,
+                    a.tipo AS tipo_alerta,
+                    a.comentario,
+                    DATE_FORMAT(a.fechaEmision, '%%Y-%%m-%%d') AS fecha_emision,
+                    TIME_FORMAT(a.horaEmision, '%%H:%%i:%%s') AS hora_emision,
+                    DATE_FORMAT(a.fechaAtencion, '%%Y-%%m-%%d') AS fecha_atencion,
+                    TIME_FORMAT(a.horaAtencion, '%%H:%%i:%%s') AS hora_atencion,
                     p.idProductos,
                     p.producto AS nombre_producto,
                     p.url_foto AS url_foto_producto,
-                    COALESCE(sr.cant_almacen, 0) AS stock_actual,
-                    COALESCE(sr.stock_minimo, 0) AS stock_minimo,
+                    COALESCE(pp.stock_actual, sr.cant_almacen, 0) AS stock_actual,
+                    COALESCE(pp.stock_minimo, sr.stock_minimo, 0) AS stock_minimo,
                     pdv.idPuntosVenta,
                     pdv.puntoVenta AS local_nombre,
                     pdv.direccion AS local_direccion,
@@ -144,7 +151,8 @@ class SupervisionRepository:
                 FROM ALERTAS_STOCK a
                 INNER JOIN PRODUCTOS p ON a.idProductos = p.idProductos
                 INNER JOIN PUNTOS_VENTA pdv ON a.idPuntosVenta = pdv.idPuntosVenta
-                INNER JOIN USUARIOS u ON pdv.idUsuario = u.idUsuario
+                LEFT JOIN PDV_PRODUCTOS pp ON a.idPuntosVenta = pp.idPuntosVenta AND a.idProductos = pp.idProductos
+                LEFT JOIN USUARIOS u ON pdv.idUsuario = u.idUsuario
                 LEFT JOIN Pedido ped ON ped.idProductos = a.idProductos AND ped.idPuntosVenta = a.idPuntosVenta
                 LEFT JOIN STOCK_REGISTROS sr ON sr.idPedido = ped.idPedido
                 WHERE a.idAlertas = %s
@@ -155,6 +163,75 @@ class SupervisionRepository:
             return cursor.fetchone()
         finally:
             cursor.close()
+
+    def cambiar_estado_alerta(self, idAlerta, nuevo_estado, comentario=None):
+        cursor = self.connection.cursor()
+        try:
+            estado_limpio = (nuevo_estado or "").strip().upper()
+            if estado_limpio not in ("ATENDIDA", "IGNORADA", "PENDIENTE"):
+                return None, "Estado inválido. Debe ser 'ATENDIDA' o 'IGNORADA'", 400
+
+            # 1. Verificar existencia de la alerta
+            cursor.execute("SELECT idAlertas, estado, comentario FROM ALERTAS_STOCK WHERE idAlertas = %s LIMIT 1", (idAlerta,))
+            alerta = cursor.fetchone()
+            if not alerta:
+                return None, "Alerta no encontrada", 404
+
+            # 2. Actualizar estado y fecha/hora de atención
+            if estado_limpio == "PENDIENTE":
+                if comentario is not None and str(comentario).strip() != "":
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = 'PENDIENTE',
+                            fechaAtencion = NULL,
+                            horaAtencion = NULL,
+                            comentario = %s
+                        WHERE idAlertas = %s
+                    """, (str(comentario).strip(), idAlerta))
+                else:
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = 'PENDIENTE',
+                            fechaAtencion = NULL,
+                            horaAtencion = NULL
+                        WHERE idAlertas = %s
+                    """, (idAlerta,))
+            else:
+                if comentario is not None and str(comentario).strip() != "":
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = %s,
+                            fechaAtencion = CURDATE(),
+                            horaAtencion = CURTIME(),
+                            comentario = %s
+                        WHERE idAlertas = %s
+                    """, (estado_limpio, str(comentario).strip(), idAlerta))
+                else:
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = %s,
+                            fechaAtencion = CURDATE(),
+                            horaAtencion = CURTIME()
+                        WHERE idAlertas = %s
+                    """, (estado_limpio, idAlerta))
+
+            self.connection.commit()
+
+            # 3. Retornar detalle actualizado
+            detalle = self.obtener_detalle_alerta(idAlerta)
+            return detalle, f"Alerta marcada como {estado_limpio} exitosamente", 200
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error en cambiar_estado_alerta: {e}")
+            raise e
+        finally:
+            cursor.close()
+
+    def marcar_alerta_atendida(self, idAlerta, comentario=None):
+        return self.cambiar_estado_alerta(idAlerta, "ATENDIDA", comentario)
+
+    def marcar_alerta_ignorada(self, idAlerta, comentario=None):
+        return self.cambiar_estado_alerta(idAlerta, "IGNORADA", comentario)
 
     def listar_puntos_venta(self, estado=None):
         cursor = self.connection.cursor()
@@ -466,9 +543,18 @@ class SupervisionRepository:
             query = """
                 SELECT 
                     a.idAlertas AS idAlerta,
+                    a.idAlertas,
                     a.estado AS estado_resolucion,
-                    a.tipo AS nivel_alerta,
+                    a.tipo AS tipo_alerta,
+                    a.severidad AS nivel_alerta,
+                    a.comentario,
+                    DATE_FORMAT(a.fechaEmision, '%%Y-%%m-%%d') AS fecha_emision,
+                    TIME_FORMAT(a.horaEmision, '%%H:%%i:%%s') AS hora_emision,
+                    DATE_FORMAT(a.fechaAtencion, '%%Y-%%m-%%d') AS fecha_atencion,
+                    TIME_FORMAT(a.horaAtencion, '%%H:%%i:%%s') AS hora_atencion,
+                    pv.idPuntosVenta,
                     pv.puntoVenta AS local_nombre,
+                    p.idProductos,
                     p.producto AS nombre_producto
                 FROM ALERTAS_STOCK a
                 INNER JOIN PUNTOS_VENTA pv ON a.idPuntosVenta = pv.idPuntosVenta

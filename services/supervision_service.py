@@ -64,6 +64,24 @@ class SupervisionService:
         finally:
             connection.close()
 
+    def cambiar_estado_alerta(self, idAlerta, nuevo_estado, comentario=None):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data, message, http_code = repo.cambiar_estado_alerta(idAlerta, nuevo_estado, comentario)
+            return data, message, http_code
+        except Exception as e:
+            print(f"Error al cambiar estado alerta: {e}")
+            return None, "Error interno al actualizar estado de la alerta", 500
+        finally:
+            connection.close()
+
+    def marcar_alerta_atendida(self, idAlerta, comentario=None):
+        return self.cambiar_estado_alerta(idAlerta, "ATENDIDA", comentario)
+
+    def marcar_alerta_ignorada(self, idAlerta, comentario=None):
+        return self.cambiar_estado_alerta(idAlerta, "IGNORADA", comentario)
+
     def listar_puntos_venta(self, estado=None):
         connection = get_connection()
         try:

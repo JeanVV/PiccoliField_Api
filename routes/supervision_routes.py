@@ -261,3 +261,95 @@ def detalle_alerta(idAlerta):
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/estado", methods=["PUT", "PATCH", "POST"])
+@jwt_required()
+def actualizar_estado_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    nuevo_estado = datos.get("estado")
+    comentario = datos.get("comentario")
+
+    if not nuevo_estado:
+        return error_response("El campo 'estado' es obligatorio ('ATENDIDA' o 'IGNORADA')", 400)
+
+    service = SupervisionService()
+    data, message, http_code = service.cambiar_estado_alerta(idAlerta, nuevo_estado, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/atender", methods=["PUT", "POST"])
+@jwt_required()
+def atender_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    comentario = datos.get("comentario")
+
+    service = SupervisionService()
+    data, message, http_code = service.marcar_alerta_atendida(idAlerta, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/ignorar", methods=["PUT", "POST"])
+@jwt_required()
+def ignorar_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    comentario = datos.get("comentario")
+
+    service = SupervisionService()
+    data, message, http_code = service.marcar_alerta_ignorada(idAlerta, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/estado", methods=["PUT", "PATCH", "POST"])
+@jwt_required()
+def actualizar_estado_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    nuevo_estado = datos.get("estado")
+    comentario = datos.get("comentario")
+
+    if not nuevo_estado:
+        return error_response("El campo 'estado' es obligatorio ('ATENDIDA' o 'IGNORADA')", 400)
+
+    service = SupervisionService()
+    data, message, http_code = service.cambiar_estado_alerta(idAlerta, nuevo_estado, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/atender", methods=["PUT", "POST"])
+@jwt_required()
+def atender_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    comentario = datos.get("comentario")
+
+    service = SupervisionService()
+    data, message, http_code = service.marcar_alerta_atendida(idAlerta, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/alertas/<int:idAlerta>/ignorar", methods=["PUT", "POST"])
+@jwt_required()
+def ignorar_alerta(idAlerta):
+    datos = request.get_json(silent=True) or {}
+    comentario = datos.get("comentario")
+
+    service = SupervisionService()
+    data, message, http_code = service.marcar_alerta_ignorada(idAlerta, comentario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
