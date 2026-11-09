@@ -225,7 +225,7 @@ class ImpulsadorRepository:
                     p.estado,
                     pdvp.stock_actual,
                     pdvp.stock_minimo,
-                    pdvp.precio
+                    p.precio
                 FROM PDV_PRODUCTOS pdvp
                 INNER JOIN PRODUCTOS p ON pdvp.idProductos = p.idProductos
                 WHERE pdvp.idPuntosVenta = %s
@@ -252,7 +252,7 @@ class ImpulsadorRepository:
                     p.url_foto,
                     pdvp.stock_actual,
                     pdvp.stock_minimo,
-                    pdvp.precio,
+                    p.precio,
                     CASE 
                         WHEN pdvp.stock_actual = 0 THEN 'AGOTADO'
                         WHEN pdvp.stock_actual <= pdvp.stock_minimo THEN 'BAJO'
@@ -283,7 +283,7 @@ class ImpulsadorRepository:
                 SELECT 
                     pdvp.stock_actual,
                     pdvp.stock_minimo,
-                    pdvp.precio,
+                    p.precio,
                     p.producto,
                     p.codigo_ean
                 FROM PDV_PRODUCTOS pdvp
@@ -521,7 +521,7 @@ class ImpulsadorRepository:
                 SELECT 
                     pdvp.stock_actual,
                     pdvp.stock_minimo,
-                    pdvp.precio,
+                    p.precio,
                     p.producto,
                     p.codigo_ean
                 FROM PDV_PRODUCTOS pdvp
@@ -540,8 +540,8 @@ class ImpulsadorRepository:
                     return None, "El producto especificado no existe en el sistema", 404
 
                 cursor.execute("""
-                    INSERT INTO PDV_PRODUCTOS (idPuntosVenta, idProductos, stock_actual, stock_minimo, precio)
-                    VALUES (%s, %s, %s, 5, 0.00)
+                    INSERT INTO PDV_PRODUCTOS (idPuntosVenta, idProductos, stock_actual, stock_minimo)
+                    VALUES (%s, %s, %s, 5)
                 """, (idPuntosVenta, idProductos, cantidad))
 
                 stock_anterior = 0

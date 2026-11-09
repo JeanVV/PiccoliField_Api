@@ -29,6 +29,7 @@ CREATE TABLE PRODUCTOS (
     codigo_ean VARCHAR(50) UNIQUE,
     producto VARCHAR(150) NOT NULL,
     categoria VARCHAR(100) NOT NULL,
+    precio DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     descripcion TEXT,
     url_foto VARCHAR(255),
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO'
@@ -208,7 +209,6 @@ CREATE TABLE PDV_PRODUCTOS (
     idProductos INT NOT NULL,
     stock_actual INT NOT NULL DEFAULT 0,
     stock_minimo INT NOT NULL DEFAULT 0,
-    precio DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     PRIMARY KEY (idPuntosVenta, idProductos),
     FOREIGN KEY (idPuntosVenta) REFERENCES PUNTOS_VENTA(idPuntosVenta),
     FOREIGN KEY (idProductos) REFERENCES PRODUCTOS(idProductos)
