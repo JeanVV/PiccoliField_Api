@@ -696,6 +696,115 @@
           "response": []
         }
       ]
+    },
+    {
+      "name": "4. Módulo de Impulsador",
+      "item": [
+        {
+          "name": "Dashboard del Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/dashboard",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "dashboard"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Escanear producto por código de barras",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/productos/codigo/7751234567890",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "productos",
+                "codigo",
+                "7751234567890"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar venta (descuenta stock y emite alerta si llega a mínimo)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"codigo_barras\": \"7751234567890\",\n    \"cantidad\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/impulsador/ventas/registrar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "ventas",
+                "registrar"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reponer stock (aumenta stock y resuelve alertas)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"codigo_barras\": \"7751234567890\",\n    \"cantidad\": 10,\n    \"observacion\": \"Lote recibido desde almacén central\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/impulsador/stock/reponer",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "stock",
+                "reponer"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
     }
   ],
   "auth": {

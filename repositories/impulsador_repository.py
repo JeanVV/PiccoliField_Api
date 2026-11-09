@@ -397,6 +397,35 @@ class ImpulsadorRepository:
                     """, (tipo_alerta, comentario, severidad, idProductos, idPuntosVenta))
                     idAlerta = cursor.lastrowid
                     alerta_generada = True
+                elif nuevo_stock <= 0:
+                    # Escalar alerta existente a STOCK_AGOTADO con severidad ALTA
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET tipo = 'STOCK_AGOTADO',
+                            severidad = 'ALTA',
+                            comentario = %s
+                        WHERE idAlertas = %s
+                    """, (f"Stock agotado tras venta. Stock actual: 0, Mínimo: {stock_minimo}", alerta_existente["idAlertas"]))
+                    idAlerta = alerta_existente["idAlertas"]
+                    alerta_generada = True
+
+            # g) Calcular avance acumulado del mes hacia la meta del impulsador
+            sql_meta = """
+                SELECT 
+                    u.meta_ventas,
+                    COALESCE(SUM(v.total), 0) AS total_vendido_mes
+                FROM USUARIOS u
+                LEFT JOIN VENTAS v ON v.idUsuario = u.idUsuario 
+                  AND MONTH(v.fecha) = MONTH(CURDATE()) 
+                  AND YEAR(v.fecha) = YEAR(CURDATE())
+                WHERE u.idUsuario = %s
+                GROUP BY u.idUsuario, u.meta_ventas
+            """
+            cursor.execute(sql_meta, (idUsuario,))
+            row_meta = cursor.fetchone() or {}
+            meta_val = float(row_meta.get("meta_ventas") or 0.0)
+            monto_mes = float(row_meta.get("total_vendido_mes") or subtotal)
+            pct_meta = round((monto_mes / meta_val) * 100, 2) if meta_val > 0 else 0.0
 
             self.connection.commit()
 
@@ -412,7 +441,12 @@ class ImpulsadorRepository:
                 "stock_actual": nuevo_stock,
                 "stock_minimo": stock_minimo,
                 "alerta_generada": alerta_generada,
-                "idAlerta": idAlerta
+                "idAlerta": idAlerta,
+                "avance_meta": {
+                    "meta_mensual": meta_val,
+                    "total_vendido_mes": monto_mes,
+                    "porcentaje_cumplimiento": pct_meta
+                }
             }
 
             mensaje = "Venta registrada exitosamente"
@@ -471,6 +505,190 @@ class ImpulsadorRepository:
                 "idEvidencia": idEvidencia,
                 "tiene_foto": bool(ruta_evidencia)
             }, "Incidencia reportada exitosamente", 201
+
+        except Exception as e:
+            self.connection.rollback()
+            raise e
+        finally:
+            cursor.close()
+
+    # ── 6. REPONER STOCK DE PRODUCTO ──────────────────────────────────────────
+    def reponer_stock(self, idUsuario, idPuntosVenta, idProductos, cantidad, observacion=None, cant_exhibida=None, cant_almacen=None, ruta_evidencia=None, hash_sha=None, idAlerta=None):
+        cursor = self.connection.cursor()
+        try:
+            # a) Verificar y bloquear producto en el PDV
+            sql_check = """
+                SELECT 
+                    pdvp.stock_actual,
+                    pdvp.stock_minimo,
+                    pdvp.precio,
+                    p.producto,
+                    p.codigo_ean
+                FROM PDV_PRODUCTOS pdvp
+                INNER JOIN PRODUCTOS p ON pdvp.idProductos = p.idProductos
+                WHERE pdvp.idPuntosVenta = %s AND pdvp.idProductos = %s
+                FOR UPDATE
+            """
+            cursor.execute(sql_check, (idPuntosVenta, idProductos))
+            prod_info = cursor.fetchone()
+
+            if not prod_info:
+                # Si el producto existe en el catálogo general pero aún no está en PDV_PRODUCTOS, crearlo
+                cursor.execute("SELECT producto, codigo_ean FROM PRODUCTOS WHERE idProductos = %s LIMIT 1", (idProductos,))
+                p_base = cursor.fetchone()
+                if not p_base:
+                    return None, "El producto especificado no existe en el sistema", 404
+
+                cursor.execute("""
+                    INSERT INTO PDV_PRODUCTOS (idPuntosVenta, idProductos, stock_actual, stock_minimo, precio)
+                    VALUES (%s, %s, %s, 5, 0.00)
+                """, (idPuntosVenta, idProductos, cantidad))
+
+                stock_anterior = 0
+                nuevo_stock = cantidad
+                stock_minimo = 5
+                nombre_producto = p_base["producto"]
+                codigo_ean = p_base["codigo_ean"]
+            else:
+                stock_anterior = prod_info["stock_actual"]
+                stock_minimo = prod_info["stock_minimo"]
+                nombre_producto = prod_info["producto"]
+                codigo_ean = prod_info["codigo_ean"]
+                nuevo_stock = stock_anterior + cantidad
+
+                # Actualizar stock en PDV_PRODUCTOS
+                sql_update_pdv = """
+                    UPDATE PDV_PRODUCTOS 
+                    SET stock_actual = %s 
+                    WHERE idPuntosVenta = %s AND idProductos = %s
+                """
+                cursor.execute(sql_update_pdv, (nuevo_stock, idPuntosVenta, idProductos))
+
+            # b) Sincronizar en STOCK_REGISTROS y Pedido
+            sql_sync_stock = """
+                SELECT sr.idStock, sr.cant_exhibida, sr.cant_almacen, sr.idPedido
+                FROM Pedido ped
+                INNER JOIN STOCK_REGISTROS sr ON sr.idPedido = ped.idPedido
+                WHERE ped.idPuntosVenta = %s AND ped.idProductos = %s
+                ORDER BY sr.fecha DESC
+                LIMIT 1
+                FOR UPDATE
+            """
+            cursor.execute(sql_sync_stock, (idPuntosVenta, idProductos))
+            sr_row = cursor.fetchone()
+
+            if sr_row:
+                idStock = sr_row["idStock"]
+                c_exh = int(cant_exhibida) if cant_exhibida is not None else sr_row["cant_exhibida"]
+                c_alm = int(cant_almacen) if cant_almacen is not None else (sr_row["cant_almacen"] + cantidad)
+                estado_sr = "OPTIMO" if (c_exh + c_alm) > stock_minimo else ("BAJO" if (c_exh + c_alm) > 0 else "AGOTADO")
+
+                cursor.execute("""
+                    UPDATE STOCK_REGISTROS 
+                    SET cant_exhibida = %s, cant_almacen = %s, estadoStock = %s, observacion = COALESCE(%s, observacion), fecha = NOW()
+                    WHERE idStock = %s
+                """, (c_exh, c_alm, estado_sr, observacion, idStock))
+            else:
+                cursor.execute("""
+                    INSERT INTO Pedido (cantSolicitada, fecha, estado, idPuntosVenta, idProductos)
+                    VALUES (%s, NOW(), 'ENTREGADO', %s, %s)
+                """, (cantidad, idPuntosVenta, idProductos))
+                idPedido = cursor.lastrowid
+
+                c_exh = int(cant_exhibida) if cant_exhibida is not None else 0
+                c_alm = int(cant_almacen) if cant_almacen is not None else cantidad
+                estado_sr = "OPTIMO" if nuevo_stock > stock_minimo else "BAJO"
+
+                cursor.execute("""
+                    INSERT INTO STOCK_REGISTROS (cant_exhibida, cant_almacen, estadoStock, observacion, fecha, stock_minimo, idPedido)
+                    VALUES (%s, %s, %s, %s, NOW(), %s, %s)
+                """, (c_exh, c_alm, estado_sr, observacion, stock_minimo, idPedido))
+                idStock = cursor.lastrowid
+
+            # c) Registrar evidencia fotográfica si se adjuntó
+            idEvidencia = None
+            if ruta_evidencia and hash_sha:
+                cursor.execute("""
+                    INSERT INTO EVIDENCIAS (
+                        ruta_archivo,
+                        hash_sha,
+                        tipo,
+                        fecha_captura,
+                        idStock
+                    ) VALUES (%s, %s, 'REPOSICION_STOCK', NOW(), %s)
+                """, (ruta_evidencia, hash_sha, idStock))
+                idEvidencia = cursor.lastrowid
+
+            # d) Resolver alerta de stock si el nuevo stock supera el mínimo o se pasó idAlerta específico
+            alerta_resuelta = False
+            idAlerta_resuelta = None
+
+            if idAlerta:
+                cursor.execute("SELECT idAlertas, comentario FROM ALERTAS_STOCK WHERE idAlertas = %s AND estado = 'PENDIENTE' LIMIT 1", (idAlerta,))
+                alerta_row = cursor.fetchone()
+                if alerta_row:
+                    idAlerta_resuelta = alerta_row["idAlertas"]
+                    texto_nota = f" | Reposición de stock: +{cantidad} unidades. Stock actual: {nuevo_stock}."
+                    if observacion:
+                        texto_nota += f" Nota: {observacion}"
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = 'ATENDIDA',
+                            fechaAtencion = CURDATE(),
+                            horaAtencion = CURTIME(),
+                            comentario = CONCAT(COALESCE(comentario, ''), %s)
+                        WHERE idAlertas = %s
+                    """, (texto_nota, idAlerta_resuelta))
+                    alerta_resuelta = True
+            elif nuevo_stock > stock_minimo:
+                cursor.execute("""
+                    SELECT idAlertas, comentario FROM ALERTAS_STOCK 
+                    WHERE idPuntosVenta = %s AND idProductos = %s AND estado = 'PENDIENTE'
+                    ORDER BY idAlertas DESC
+                    LIMIT 1
+                """, (idPuntosVenta, idProductos))
+                alerta_row = cursor.fetchone()
+                if alerta_row:
+                    idAlerta_resuelta = alerta_row["idAlertas"]
+                    texto_nota = f" | Reposición de stock: +{cantidad} unidades. Stock actual: {nuevo_stock}."
+                    if observacion:
+                        texto_nota += f" Nota: {observacion}"
+                    cursor.execute("""
+                        UPDATE ALERTAS_STOCK
+                        SET estado = 'ATENDIDA',
+                            fechaAtencion = CURDATE(),
+                            horaAtencion = CURTIME(),
+                            comentario = CONCAT(COALESCE(comentario, ''), %s)
+                        WHERE idAlertas = %s
+                    """, (texto_nota, idAlerta_resuelta))
+                    alerta_resuelta = True
+
+            self.connection.commit()
+
+            resultado = {
+                "idProductos": idProductos,
+                "producto": nombre_producto,
+                "codigo_ean": codigo_ean,
+                "idPuntosVenta": idPuntosVenta,
+                "cantidad_repuesta": cantidad,
+                "stock_anterior": stock_anterior,
+                "stock_actual": nuevo_stock,
+                "stock_minimo": stock_minimo,
+                "estado_stock": estado_sr,
+                "alerta_resuelta": alerta_resuelta,
+                "idAlerta": idAlerta_resuelta,
+                "observacion": observacion,
+                "tiene_evidencia": bool(ruta_evidencia),
+                "idStock": idStock,
+                "idEvidencia": idEvidencia,
+                "fecha": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+
+            mensaje = f"Stock repuesto exitosamente (+{cantidad} unidades). Stock actual: {nuevo_stock}"
+            if alerta_resuelta:
+                mensaje += " (Alerta de stock resuelta y marcada como ATENDIDA automáticamente)"
+
+            return resultado, mensaje, 200
 
         except Exception as e:
             self.connection.rollback()

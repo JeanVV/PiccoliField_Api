@@ -133,3 +133,30 @@ def reportar_incidencia():
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
+
+
+# ── 7. REPONER STOCK DE PRODUCTO EN EL LOCAL ──────────────────────────────────
+@impulsador_bp.route("/api/impulsador/stock/reponer", methods=["POST"])
+@impulsador_bp.route("/api/impulsador/productos/reponer", methods=["POST"])
+@jwt_required()
+def reponer_stock():
+    idUsuario = get_jwt_identity()
+
+    # Si viene como multipart/form-data
+    if request.files:
+        payload = request.form.to_dict()
+        foto = request.files.get("foto") or request.files.get("imagen")
+    else:
+        payload = request.get_json(silent=True) or {}
+        foto = None
+
+    service = ImpulsadorService()
+    data, message, http_code = service.reponer_stock(
+        idUsuario=idUsuario,
+        payload=payload,
+        archivo_foto=foto
+    )
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)

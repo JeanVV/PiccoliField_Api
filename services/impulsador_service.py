@@ -284,3 +284,91 @@ class ImpulsadorService:
             return None, f"Error interno al reportar incidencia: {str(e)}", 500
         finally:
             connection.close()
+
+    # ── 7. REPONER STOCK DE PRODUCTO ───────────────────────────────────────────
+    def reponer_stock(self, idUsuario, payload, archivo_foto=None):
+        codigo_barras = payload.get("codigo_barras") or payload.get("codigo") or payload.get("codigo_ean")
+        idProductos = payload.get("idProductos")
+        cantidad = payload.get("cantidad")
+        idPuntosVenta = payload.get("idPuntosVenta")
+        observacion = payload.get("observacion") or payload.get("detalles") or payload.get("comentario")
+        cant_exhibida = payload.get("cant_exhibida")
+        cant_almacen = payload.get("cant_almacen")
+        idAlerta = payload.get("idAlerta")
+        foto_base64 = payload.get("foto_base64")
+
+        try:
+            cantidad = int(cantidad)
+            if cantidad <= 0:
+                return None, "La cantidad a reponer debe ser mayor a 0", 400
+        except (ValueError, TypeError):
+            return None, "El campo 'cantidad' es obligatorio y debe ser un número entero mayor a 0", 400
+
+        if not codigo_barras and not idProductos:
+            return None, "Debe enviar 'codigo_barras' o 'idProductos'", 400
+
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+
+            # Resolver punto de venta si no vino explícito
+            if not idPuntosVenta:
+                pdv = repo.obtener_asignacion_actual(idUsuario)
+                if not pdv:
+                    return None, "El usuario no tiene un punto de venta asignado actualmente", 400
+                idPuntosVenta = pdv["idPuntosVenta"]
+
+            # Si se envió código de barras pero no idProductos, resolver producto
+            if not idProductos:
+                prod = repo.buscar_producto_por_codigo(idPuntosVenta, codigo_barras)
+                if not prod:
+                    return None, f"No se encontró ningún producto con código '{codigo_barras}' en este local", 404
+                idProductos = prod["idProductos"]
+
+            # Manejo de fotografía de evidencia (archivo Multipart o Base64)
+            ruta_relativa = None
+            hash_sha = None
+
+            evidencias_dir = getattr(Config, "EVIDENCIAS_DIR", os.path.join(BASE_DIR, "uploads", "evidencias"))
+            os.makedirs(evidencias_dir, exist_ok=True)
+
+            contenido_bytes = None
+            nombre_archivo = f"reposicion_u{idUsuario}_{int(time.time())}.jpg"
+
+            if archivo_foto and hasattr(archivo_foto, "read"):
+                contenido_bytes = archivo_foto.read()
+            elif foto_base64 and isinstance(foto_base64, str):
+                try:
+                    if "base64," in foto_base64:
+                        foto_base64 = foto_base64.split("base64,")[1]
+                    contenido_bytes = base64.b64decode(foto_base64)
+                except Exception as ex:
+                    print(f"Error al decodificar base64: {ex}")
+
+            if contenido_bytes:
+                hash_sha = hashlib.sha256(contenido_bytes).hexdigest()
+                ruta_fisica = os.path.join(evidencias_dir, nombre_archivo)
+                with open(ruta_fisica, "wb") as f:
+                    f.write(contenido_bytes)
+                ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
+
+            resultado, mensaje, http_code = repo.reponer_stock(
+                idUsuario=idUsuario,
+                idPuntosVenta=idPuntosVenta,
+                idProductos=idProductos,
+                cantidad=cantidad,
+                observacion=observacion,
+                cant_exhibida=cant_exhibida,
+                cant_almacen=cant_almacen,
+                ruta_evidencia=ruta_relativa,
+                hash_sha=hash_sha,
+                idAlerta=idAlerta
+            )
+
+            return resultado, mensaje, http_code
+
+        except Exception as e:
+            print(f"Error en reponer_stock: {e}")
+            return None, f"Error interno al reponer stock: {str(e)}", 500
+        finally:
+            connection.close()
