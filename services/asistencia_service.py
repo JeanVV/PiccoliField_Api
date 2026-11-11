@@ -136,3 +136,19 @@ class AsistenciaService:
             return None, f"Error al consultar justificación: {str(e)}", 500
         finally:
             connection.close()
+
+    def obtener_ultima_asistencia(self, id_usuario):
+        return self.repository.obtener_ultima_asistencia(id_usuario)
+
+    def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
+        if not id_usuario_colaborador:
+            raise ValueError("El idUsuario del colaborador es obligatorio.")
+        if not estado_nuevo:
+            raise ValueError("El estadoNuevo ('APROBADA'/'RECHAZADA') es obligatorio.")
+            
+        return self.repository.revisar_justificacion(
+            id_usuario_colaborador, 
+            estado_nuevo, 
+            comentario_admin, 
+            id_revisor
+        )

@@ -259,3 +259,56 @@ class AsistenciaRepository:
             except ValueError:
                 pass
         return datetime.now()
+
+    # 8. OBTENER ÚLTIMA ASISTENCIA DEL USUARIO
+    def obtener_ultima_asistencia(self, id_usuario):
+        cursor = self.db.cursor(dictionary=True)
+        query = """
+            SELECT 
+                idAsistencias AS id,
+                DATE_FORMAT(fecha_hora_servidor, '%Y-%m-%d') AS fecha,
+                DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora,
+                latitud,
+                longitud,
+                observacion AS direccion
+            FROM ASISTENCIAS
+            WHERE idUsuario = %s
+            ORDER BY idAsistencias DESC
+            LIMIT 1
+        """
+        cursor.execute(query, (id_usuario,))
+        resultado = cursor.fetchone()
+        cursor.close()
+        
+        # Convertir Decimal de MySQL a float para serializar a JSON
+        if resultado:
+            if resultado.get('latitud') is not None:
+                resultado['latitud'] = float(resultado['latitud'])
+            if resultado.get('longitud') is not None:
+                resultado['longitud'] = float(resultado['longitud'])
+        
+        return resultado
+
+    # 9. REVISAR (APROBAR/RECHAZAR) JUSTIFICACIÓN COMO ADMINISTRADOR
+    def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
+        cursor = self.db.cursor()
+        
+        # Mapeo de estados ('APROBADA', 'RECHAZADA')
+        estado_enum = 'APROBADA' if estado_nuevo.upper() in ['APROBADA', 'APROBADO'] else 'RECHAZADA'
+        
+        query = """
+            UPDATE JUSTIFICACIONES
+            SET 
+                estado = %s,
+                comentario_revision = %s,
+                fecha_revision = NOW(),
+                idRevisor = %s
+            WHERE idUsuario = %s AND estado = 'PENDIENTE'
+            ORDER BY idJustificacion DESC
+            LIMIT 1
+        """
+        cursor.execute(query, (estado_enum, comentario_admin, id_revisor, id_usuario_colaborador))
+        filas_afectadas = cursor.rowcount
+        self.db.commit()
+        cursor.close()
+        return filas_afectadas > 0
