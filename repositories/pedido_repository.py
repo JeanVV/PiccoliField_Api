@@ -6,6 +6,8 @@ class PedidoRepository:
         self.connection = connection
 
     def buscar_operacion_sync(self, idOperacion):
+        if not idOperacion:
+            return None
         cursor = self.connection.cursor()
         try:
             sql = """
@@ -14,7 +16,7 @@ class PedidoRepository:
                 WHERE idOperacion = %s
                 LIMIT 1
             """
-            cursor.execute(sql, (str(idOperacion),))
+            cursor.execute(sql, (str(idOperacion)[:36],))
             row = cursor.fetchone()
             if row and row.get("resultado_json"):
                 if isinstance(row["resultado_json"], str):
@@ -23,10 +25,16 @@ class PedidoRepository:
                     except Exception:
                         pass
             return row
+        except Exception as e:
+            # Si la tabla no existe o error, no bloquear el flujo
+            print(f"Aviso en buscar_operacion_sync: {e}")
+            return None
         finally:
             cursor.close()
 
     def registrar_operacion_sync(self, idOperacion, tipo, resultado_json, idUsuario):
+        if not idOperacion:
+            return
         cursor = self.connection.cursor()
         try:
             sql = """
@@ -34,7 +42,10 @@ class PedidoRepository:
                 VALUES (%s, %s, %s, NOW(), %s)
             """
             data_str = json.dumps(resultado_json, ensure_ascii=False) if not isinstance(resultado_json, str) else resultado_json
-            cursor.execute(sql, (str(idOperacion), tipo, data_str, idUsuario))
+            cursor.execute(sql, (str(idOperacion)[:36], tipo, data_str, int(idUsuario)))
+        except Exception as e:
+            # Loguear advertencia sin interrumpir la creación del pedido
+            print(f"Aviso en registrar_operacion_sync: {e}")
         finally:
             cursor.close()
 
@@ -60,7 +71,9 @@ class PedidoRepository:
                     pr.codigo_ean,
                     pr.producto,
                     pr.categoria,
-                    pr.presentacion
+                    pr.precio,
+                    pr.descripcion,
+                    pr.url_foto
                 FROM Pedido ped
                 INNER JOIN PUNTOS_VENTA pv ON ped.idPuntosVenta = pv.idPuntosVenta
                 INNER JOIN PRODUCTOS pr ON ped.idProductos = pr.idProductos
@@ -94,7 +107,9 @@ class PedidoRepository:
                     pr.codigo_ean,
                     pr.producto,
                     pr.categoria,
-                    pr.presentacion
+                    pr.precio,
+                    pr.descripcion,
+                    pr.url_foto
                 FROM Pedido ped
                 INNER JOIN PUNTOS_VENTA pv ON ped.idPuntosVenta = pv.idPuntosVenta
                 INNER JOIN PRODUCTOS pr ON ped.idProductos = pr.idProductos
@@ -106,18 +121,17 @@ class PedidoRepository:
             # Si es PROMOTOR, restringir solo a los PDV donde es responsable
             if rol == "PROMOTOR" and idUsuario is not None:
                 sql += " AND pv.idUsuario = %s"
-                params.append(idUsuario)
+                params.append(int(idUsuario))
 
             if idPuntosVenta:
                 sql += " AND ped.idPuntosVenta = %s"
-                params.append(idPuntosVenta)
+                params.append(int(idPuntosVenta))
 
             if estado:
                 sql += " AND ped.estado = %s"
                 params.append(estado)
 
             if tipo_pdv:
-                # Soportar con y sin tilde
                 if tipo_pdv.upper() in ("DISTRIBUCION", "DISTRIBUCIÓN"):
                     sql += " AND pv.tipo IN ('DISTRIBUCION', 'DISTRIBUCIÓN')"
                 else:
@@ -148,12 +162,26 @@ class PedidoRepository:
         cursor = self.connection.cursor()
         try:
             sql = """
-                SELECT idProductos, sku, codigo_ean, producto, estado
+                SELECT idProductos, sku, codigo_ean, producto, estado, precio
                 FROM PRODUCTOS
                 WHERE idProductos = %s
                 LIMIT 1
             """
             cursor.execute(sql, (idProductos,))
+            return cursor.fetchone()
+        finally:
+            cursor.close()
+
+    def buscar_producto_por_codigo(self, codigo):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT idProductos, sku, codigo_ean, producto, estado, precio
+                FROM PRODUCTOS
+                WHERE (codigo_ean = %s OR sku = %s)
+                LIMIT 1
+            """
+            cursor.execute(sql, (str(codigo).strip(), str(codigo).strip()))
             return cursor.fetchone()
         finally:
             cursor.close()
@@ -197,4 +225,3 @@ class PedidoRepository:
             raise e
         finally:
             cursor.close()
-

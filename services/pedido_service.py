@@ -1,3 +1,4 @@
+import traceback
 from database import get_connection
 from repositories.pedido_repository import PedidoRepository
 from repositories.usuario_repository import UsuarioRepository
@@ -18,9 +19,6 @@ class PedidoService:
             if rol == "IMPULSADOR":
                 return None, "Los impulsadores no tienen acceso al módulo de pedidos", 403
 
-            if rol not in ("ADMINISTRADOR", "PROMOTOR"):
-                return None, f"Rol {rol} no autorizado para ver pedidos", 403
-
             repo = PedidoRepository(connection)
             pedidos = repo.listar_pedidos(
                 idUsuario=idUsuario,
@@ -32,8 +30,8 @@ class PedidoService:
 
             return pedidos, "Pedidos obtenidos correctamente", 200
         except Exception as e:
-            print(f"Error en listar_pedidos: {e}")
-            return None, "Error interno al obtener los pedidos", 500
+            traceback.print_exc()
+            return None, f"Error interno al obtener los pedidos: {str(e)}", 500
         finally:
             connection.close()
 
@@ -62,12 +60,12 @@ class PedidoService:
 
             return pedido, "Pedido obtenido correctamente", 200
         except Exception as e:
-            print(f"Error en obtener_pedido: {e}")
-            return None, "Error interno al obtener el pedido", 500
+            traceback.print_exc()
+            return None, f"Error interno al obtener el pedido: {str(e)}", 500
         finally:
             connection.close()
 
-    def crear_pedido(self, idUsuario, payload, operation_id=None):
+    def crear_pedido(self, idUsuario, payload, operation_id=None, idPuntosVenta_url=None):
         connection = get_connection()
         try:
             user_repo = UsuarioRepository(connection)
@@ -79,9 +77,6 @@ class PedidoService:
             rol = str(usuario.get("rol", "")).upper()
             if rol == "IMPULSADOR":
                 return None, "Los impulsadores no tienen permisos para registrar pedidos", 403
-
-            if rol not in ("ADMINISTRADOR", "PROMOTOR"):
-                return None, f"Rol {rol} no autorizado para registrar pedidos", 403
 
             repo = PedidoRepository(connection)
 
@@ -96,31 +91,28 @@ class PedidoService:
                         200
                     )
 
-            # Validar campos de entrada
-            idPuntosVenta = payload.get("idPuntosVenta")
-            idProductos = payload.get("idProductos")
-            cantSolicitada = payload.get("cantSolicitada")
-            if cantSolicitada is None:
-                cantSolicitada = payload.get("cantidad")
+            # Extraer idPuntosVenta (de URL o del body)
+            idPuntosVenta = (
+                idPuntosVenta_url
+                or payload.get("idPuntosVenta")
+                or payload.get("idPuntoVenta")
+                or payload.get("id_puntos_venta")
+                or payload.get("id_punto_venta")
+                or payload.get("punto_venta_id")
+            )
 
-            if idPuntosVenta is None or idProductos is None or cantSolicitada is None:
-                return None, "Los campos idPuntosVenta, idProductos y cantSolicitada son obligatorios", 400
+            if idPuntosVenta is None:
+                return None, "El campo 'idPuntosVenta' es obligatorio", 400
 
             try:
                 idPuntosVenta = int(idPuntosVenta)
-                idProductos = int(idProductos)
-                cantSolicitada = int(cantSolicitada)
             except (ValueError, TypeError):
-                return None, "idPuntosVenta, idProductos y cantSolicitada deben ser números enteros", 400
-
-            # Validar regla: cantidad > 0 (422)
-            if cantSolicitada <= 0:
-                return None, "La cantidad solicitada debe ser mayor a 0", 422
+                return None, "idPuntosVenta debe ser un número entero válido", 400
 
             # Validar PDV
             pdv = repo.validar_pdv(idPuntosVenta)
             if not pdv:
-                return None, "Punto de venta no encontrado", 404
+                return None, f"Punto de venta con ID {idPuntosVenta} no encontrado", 404
 
             if str(pdv.get("estado", "")).upper() != "ACTIVO":
                 return None, f"El punto de venta no se encuentra ACTIVO (estado actual: {pdv.get('estado')})", 422
@@ -129,16 +121,92 @@ class PedidoService:
             if tipo_pdv not in ("DISTRIBUCION", "DISTRIBUCIÓN"):
                 return None, f"El punto de venta debe ser de tipo DISTRIBUCIÓN (tipo actual: {tipo_pdv})", 422
 
-            # Validar regla: si es Promotor, debe estar asignado a ese PDV (403)
+            # Validar si es Promotor asignado
             if rol == "PROMOTOR":
                 pdv_responsable = pdv.get("idUsuario")
-                if pdv_responsable is None or pdv_responsable != int(idUsuario):
-                    return None, "No tiene permisos para registrar pedidos en este punto de venta (no asignado como responsable)", 403
+                if pdv_responsable is None:
+                    return None, "El punto de venta no tiene un promotor asignado", 403
+                if int(pdv_responsable) != int(idUsuario):
+                    return None, "No está asignado como responsable de este punto de distribución", 403
+
+            # Soporte para lista de productos: payload["productos"] = [...]
+            lista_productos = payload.get("productos")
+            if lista_productos and isinstance(lista_productos, list):
+                pedidos_creados = []
+                for item in lista_productos:
+                    id_prod = item.get("idProductos") or item.get("idProducto")
+                    cant = item.get("cantSolicitada") or item.get("cantidad")
+
+                    if not id_prod or not cant:
+                        return None, "Cada producto de la lista debe tener 'idProductos' y 'cantSolicitada'", 400
+
+                    cant = int(cant)
+                    if cant <= 0:
+                        return None, "La cantidad solicitada debe ser mayor a 0", 422
+
+                    prod = repo.validar_producto(int(id_prod))
+                    if not prod or str(prod.get("estado", "")).upper() != "ACTIVO":
+                        return None, f"El producto {id_prod} no existe o está inactivo", 422
+
+                    creado = repo.crear_pedido(
+                        cantSolicitada=cant,
+                        idPuntosVenta=idPuntosVenta,
+                        idProductos=int(id_prod),
+                        idOperacion=None,
+                        idUsuario=idUsuario
+                    )
+                    pedidos_creados.append(creado)
+
+                if op_id:
+                    repo.registrar_operacion_sync(op_id, "CREAR_PEDIDO_MULTIPLE", pedidos_creados, idUsuario)
+
+                return pedidos_creados, "Pedidos registrados exitosamente", 201
+
+            # Caso producto individual
+            idProductos = (
+                payload.get("idProductos")
+                or payload.get("idProducto")
+                or payload.get("id_productos")
+                or payload.get("id_producto")
+                or payload.get("producto_id")
+            )
+
+            # Si viene código en lugar de idProductos (ej. código EAN o SKU)
+            if idProductos is None:
+                codigo = (
+                    payload.get("codigo_ean")
+                    or payload.get("codigo")
+                    or payload.get("sku")
+                    or payload.get("codigo_barras")
+                )
+                if codigo:
+                    prod_buscado = repo.buscar_producto_por_codigo(codigo)
+                    if prod_buscado:
+                        idProductos = prod_buscado["idProductos"]
+
+            cantSolicitada = (
+                payload.get("cantSolicitada")
+                or payload.get("cantidad")
+                or payload.get("cant_solicitada")
+                or payload.get("cantidad_solicitada")
+            )
+
+            if idProductos is None or cantSolicitada is None:
+                return None, "Los campos 'idProductos' y 'cantSolicitada' son obligatorios", 400
+
+            try:
+                idProductos = int(idProductos)
+                cantSolicitada = int(cantSolicitada)
+            except (ValueError, TypeError):
+                return None, "idProductos y cantSolicitada deben ser números enteros", 400
+
+            if cantSolicitada <= 0:
+                return None, "La cantidad solicitada debe ser mayor a 0", 422
 
             # Validar producto activo
             producto = repo.validar_producto(idProductos)
             if not producto:
-                return None, "El producto especificado no existe", 422
+                return None, f"El producto con ID {idProductos} no existe", 422
 
             if str(producto.get("estado", "")).upper() != "ACTIVO":
                 return None, "El producto se encuentra inactivo", 422
@@ -155,8 +223,8 @@ class PedidoService:
             return pedido_creado, "Pedido registrado exitosamente", 201
 
         except Exception as e:
-            print(f"Error en crear_pedido: {e}")
-            return None, "Error interno al registrar el pedido", 500
+            traceback.print_exc()
+            return None, f"Error al registrar pedido: {str(e)}", 500
         finally:
             connection.close()
 
@@ -170,7 +238,6 @@ class PedidoService:
                 return None, "Usuario no autenticado", 401
 
             rol = str(usuario.get("rol", "")).upper()
-            # Regla de negocio: quién cambia el estado es el Administrador
             if rol != "ADMINISTRADOR":
                 return None, "Solo los administradores pueden cambiar el estado del pedido", 403
 
@@ -189,18 +256,12 @@ class PedidoService:
 
             estado_actual = str(pedido.get("estado", "")).upper().replace(" ", "_")
 
-            # Reglas de transición:
-            # 1. Estados finales
             if estado_actual in ("ENTREGADO", "CANCELADO"):
                 return None, f"No se puede modificar un pedido en estado final ({estado_actual})", 422
 
-            # 2. Mismo estado
             if estado_actual == nuevo_estado:
                 return None, f"El pedido ya se encuentra en estado {nuevo_estado}", 422
 
-            # 3. Transiciones válidas:
-            # REGISTRADO → EN_PREPARACION, CANCELADO
-            # EN_PREPARACION → ENTREGADO, CANCELADO
             transiciones_permitidas = {
                 "REGISTRADO": ("EN_PREPARACION", "CANCELADO"),
                 "EN_PREPARACION": ("ENTREGADO", "CANCELADO")
@@ -214,8 +275,7 @@ class PedidoService:
             return pedido_actualizado, f"Estado del pedido actualizado a {nuevo_estado} exitosamente", 200
 
         except Exception as e:
-            print(f"Error en actualizar_estado: {e}")
-            return None, "Error interno al actualizar el estado del pedido", 500
+            traceback.print_exc()
+            return None, f"Error interno al actualizar el estado del pedido: {str(e)}", 500
         finally:
             connection.close()
-

@@ -10,10 +10,11 @@ service = PedidoService()
 
 # ── 1. LISTAR PEDIDOS ──────────────────────────────────────────────────────────
 @pedido_bp.route("/api/pedidos", methods=["GET"])
+@pedido_bp.route("/api/puntos-venta/<int:id_pdv>/pedidos", methods=["GET"])
 @jwt_required()
-def listar_pedidos():
+def listar_pedidos(id_pdv=None):
     idUsuario = get_jwt_identity()
-    idPuntosVenta = request.args.get("idPuntosVenta", type=int)
+    idPuntosVenta = id_pdv or request.args.get("idPuntosVenta", type=int) or request.args.get("idPuntoVenta", type=int)
     estado = request.args.get("estado")
     tipo_pdv = request.args.get("tipo") or request.args.get("tipo_pdv")
 
@@ -45,8 +46,9 @@ def obtener_pedido(id):
 
 # ── 3. REGISTRAR NUEVO PEDIDO (IDEMPOTENTE CON X-Operation-Id) ─────────────────
 @pedido_bp.route("/api/pedidos", methods=["POST"])
+@pedido_bp.route("/api/puntos-venta/<int:id_pdv>/pedidos", methods=["POST"])
 @jwt_required()
-def crear_pedido():
+def crear_pedido(id_pdv=None):
     idUsuario = get_jwt_identity()
     payload = request.get_json(silent=True)
 
@@ -58,7 +60,8 @@ def crear_pedido():
     data, message, http_code = service.crear_pedido(
         idUsuario=idUsuario,
         payload=payload,
-        operation_id=operation_id
+        operation_id=operation_id,
+        idPuntosVenta_url=id_pdv
     )
 
     if data is None:
@@ -88,4 +91,3 @@ def actualizar_estado(id):
         return error_response(message, http_code)
 
     return success_response(data, message, http_code)
-
