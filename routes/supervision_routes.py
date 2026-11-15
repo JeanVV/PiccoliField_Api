@@ -6,6 +6,7 @@ from utils.response import success_response, error_response
 
 supervision_bp = Blueprint("supervision", __name__)
 
+
 # ── 1. DASHBOARD Y RESUMEN ──────────────────────────────────────────────────
 @supervision_bp.route("/api/supervision/resumen", methods=["GET"])
 @jwt_required()
@@ -36,9 +37,10 @@ def listar_vendedores():
 def detalle_vendedor(idUsuario):
     service = SupervisionService()
     data, message, http_code = service.obtener_detalle_vendedor(idUsuario)
-    
+
     if data is None:
         return error_response(message, http_code)
+
     return success_response(data, message, http_code)
 
 
@@ -110,7 +112,7 @@ def listar_puntos_venta():
     estado = request.args.get("estado")
     service = SupervisionService()
     data, message, http_code = service.listar_puntos_venta(estado=estado)
-    
+
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
@@ -121,6 +123,18 @@ def listar_puntos_venta():
 def detalle_punto_venta(idPuntosVenta):
     service = SupervisionService()
     data, message, http_code = service.obtener_detalle_punto_venta(idPuntosVenta)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/puntos-venta/<int:idPuntosVenta>/stock", methods=["GET"])
+@supervision_bp.route("/api/supervision/puntos-venta/<int:idPuntosVenta>/productos", methods=["GET"])
+@jwt_required()
+def stock_punto_venta(idPuntosVenta):
+    service = SupervisionService()
+    data, message, http_code = service.obtener_stock_punto_venta(idPuntosVenta)
 
     if data is None:
         return error_response(message, http_code)
@@ -138,27 +152,25 @@ def historial_impulsadores_pdv(idPuntosVenta):
     return success_response(data, message, http_code)
 
 
-# ── 5. REASIGNACIÓN DE IMPULSADOR A PUNTO DE VENTA ──────────────────────────
 @supervision_bp.route("/api/supervision/reasignar-impulsador", methods=["POST"])
 @jwt_required()
 def reasignar_impulsador():
     idUsuarioRegistra = get_jwt_identity()
     datos = request.get_json(silent=True) or {}
 
+    idPuntosVenta = datos.get("idPuntosVenta")
     idUsuario = datos.get("idUsuario")
-    idPuntosVenta = datos.get("idPuntosVenta") or datos.get("idPuntoVenta") or datos.get("id") or datos.get("codigo")
     motivo = datos.get("motivo")
 
-    if not idUsuario or not idPuntosVenta:
-        return error_response("idUsuario e idPuntosVenta son obligatorios", 400)
+    if not idPuntosVenta or not idUsuario:
+        return error_response("idPuntosVenta e idUsuario son obligatorios", 400)
 
     try:
+        idPuntosVenta = int(idPuntosVenta)
         idUsuario = int(idUsuario)
         idUsuarioRegistra = int(idUsuarioRegistra)
-        if str(idPuntosVenta).isdigit():
-            idPuntosVenta = int(idPuntosVenta)
     except (ValueError, TypeError):
-        return error_response("idUsuario e idUsuarioRegistra deben ser números enteros", 400)
+        return error_response("idPuntosVenta, idUsuario e idUsuarioRegistra deben ser números enteros", 400)
 
     service = SupervisionService()
     data, message, http_code = service.reasignar_impulsador(
@@ -221,11 +233,11 @@ def reasignar_impulsador_pdv(idPuntosVenta):
         return error_response("idUsuario es obligatorio", 400)
 
     try:
-        idUsuario = int(idUsuario)
         idPuntosVenta = int(idPuntosVenta)
+        idUsuario = int(idUsuario)
         idUsuarioRegistra = int(idUsuarioRegistra)
     except (ValueError, TypeError):
-        return error_response("idUsuario e idPuntosVenta deben ser números enteros", 400)
+        return error_response("idPuntosVenta, idUsuario e idUsuarioRegistra deben ser números enteros", 400)
 
     service = SupervisionService()
     data, message, http_code = service.reasignar_impulsador(
@@ -240,7 +252,7 @@ def reasignar_impulsador_pdv(idPuntosVenta):
     return success_response(data, message, http_code)
 
 
-# ── 6. ALERTAS DE STOCK ──────────────────────────────────────────────────────
+# ── 5. ALERTAS DE STOCK ──────────────────────────────────────────────────────
 @supervision_bp.route("/api/supervision/alertas", methods=["GET"])
 @jwt_required()
 def listar_alertas():
@@ -307,3 +319,65 @@ def ignorar_alerta(idAlerta):
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
+
+
+# ── 6. GESTIÓN DE INCIDENCIAS (SUPERVISIÓN) ──────────────────────────────────
+@supervision_bp.route("/api/supervision/incidencias", methods=["GET"])
+@jwt_required()
+def listar_incidencias_supervision():
+    estado = request.args.get("estado")
+    idPuntosVenta = request.args.get("idPuntosVenta", type=int)
+    severidad = request.args.get("severidad")
+
+    service = SupervisionService()
+    data, message, http_code = service.listar_incidencias(
+        estado=estado,
+        idPuntosVenta=idPuntosVenta,
+        severidad=severidad
+    )
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/incidencias/<int:idIncidencias>", methods=["GET"])
+@jwt_required()
+def detalle_incidencia_supervision(idIncidencias):
+    service = SupervisionService()
+    data, message, http_code = service.obtener_detalle_incidencia(idIncidencias)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/incidencias/<int:idIncidencias>/atender", methods=["PUT", "POST"])
+@jwt_required()
+def atender_incidencia(idIncidencias):
+    datos = request.get_json(silent=True) or {}
+    nuevo_estado = datos.get("estado", "RESUELTO")
+    comentario = datos.get("comentario") or datos.get("comentario_atencion")
+
+    service = SupervisionService()
+    data, message, http_code = service.atender_incidencia(
+        idIncidencias=idIncidencias,
+        nuevo_estado=nuevo_estado,
+        comentario_atencion=comentario
+    )
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/incidencias/<int:idIncidencias>/foto", methods=["GET"])
+@jwt_required(optional=True)
+def foto_incidencia_supervision(idIncidencias):
+    from services.impulsador_service import ImpulsadorService
+    imp_service = ImpulsadorService()
+    file_path, message, http_code = imp_service.obtener_ruta_foto_incidencia(idIncidencias)
+
+    if not file_path:
+        return error_response(message, http_code)
+    return send_file(file_path)

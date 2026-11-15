@@ -21,8 +21,9 @@ def obtener_perfil():
     return success_response(data, message, http_code)
 
 
-# ── 2. ACTUALIZAR TOKEN FCM Y DISPOSITIVO ─────────────────────────────────────
-@usuario_bp.route("/api/perfil/fcm-token", methods=["PUT"])
+# ── 2. ACTUALIZAR TOKEN FCM (DISPOSITIVO) ────────────────────────────────────
+@usuario_bp.route("/api/perfil/fcm-token", methods=["PUT", "POST"])
+@usuario_bp.route("/api/usuario/fcm-token", methods=["PUT", "POST"])
 @jwt_required()
 def actualizar_fcm_token():
     idUsuario = get_jwt_identity()
@@ -32,10 +33,10 @@ def actualizar_fcm_token():
         return error_response("Debe enviar los datos en formato JSON", 400)
 
     fcm_token = str(datos.get("fcm_token", "")).strip()
-    id_dispositivo = str(datos.get("id_dispositivo", "")).strip()
+    id_dispositivo = datos.get("id_dispositivo") or datos.get("nombre_dispositivo")
 
-    if not fcm_token or not id_dispositivo:
-        return error_response("fcm_token e id_dispositivo son obligatorios", 400)
+    if not fcm_token:
+        return error_response("El campo 'fcm_token' es obligatorio", 400)
 
     data, message, http_code = service.actualizar_fcm_token(idUsuario, fcm_token, id_dispositivo)
 
@@ -45,7 +46,23 @@ def actualizar_fcm_token():
     return success_response(data, message, http_code)
 
 
-# ── 3. ACTUALIZAR FOTO DE UN USUARIO (PANEL WEB / ADMIN) ──────────────────────
+# ── 3. HISTORIAL DE NOTIFICACIONES RECIBIDAS ─────────────────────────────────
+@usuario_bp.route("/api/notificaciones", methods=["GET"])
+@usuario_bp.route("/api/perfil/notificaciones", methods=["GET"])
+@jwt_required()
+def listar_notificaciones():
+    idUsuario = get_jwt_identity()
+    limite = request.args.get("limite", default=20, type=int)
+
+    data, message, http_code = service.listar_notificaciones(idUsuario=idUsuario, limite=limite)
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+
+
+# ── 4. ACTUALIZAR FOTO DE UN USUARIO (PANEL WEB / ADMIN) ──────────────────────
 @usuario_bp.route("/api/usuarios/<int:id_usuario>/foto", methods=["PUT", "POST"])
 @jwt_required()
 def actualizar_foto_usuario(id_usuario):
@@ -73,7 +90,7 @@ def actualizar_foto_usuario(id_usuario):
         return jsonify({"success": False, "status": False, "message": str(e)}), 400
 
 
-# ── 4. ACTUALIZAR FOTO DE MI PROPIO PERFIL ────────────────────────────────────
+# ── 5. ACTUALIZAR FOTO DE MI PROPIO PERFIL ────────────────────────────────────
 @usuario_bp.route("/api/perfil/foto", methods=["PUT", "POST"])
 @jwt_required()
 def actualizar_foto_mi_perfil():
@@ -104,7 +121,7 @@ def actualizar_foto_mi_perfil():
         return jsonify({"success": False, "status": False, "message": str(e)}), 400
 
 
-# ── 5. OBTENER FOTO DE MI PROPIO PERFIL (STREAM DE IMAGEN) ───────────────────
+# ── 6. OBTENER FOTO DE MI PROPIO PERFIL (STREAM DE IMAGEN) ───────────────────
 @usuario_bp.route("/api/perfil/foto", methods=["GET"])
 @jwt_required()
 def obtener_foto_mi_perfil():
@@ -117,7 +134,7 @@ def obtener_foto_mi_perfil():
     return send_file(ruta, mimetype=mimetype, as_attachment=False, conditional=True)
 
 
-# ── 6. OBTENER FOTO DE UN USUARIO (STREAM DE IMAGEN) ──────────────────────────
+# ── 7. OBTENER FOTO DE UN USUARIO (STREAM DE IMAGEN) ──────────────────────────
 @usuario_bp.route("/api/usuarios/<int:id_usuario>/foto", methods=["GET"])
 @jwt_required(optional=True)
 def obtener_foto_usuario(id_usuario):

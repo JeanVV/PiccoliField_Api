@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, send_file
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from services.impulsador_service import ImpulsadorService
@@ -109,7 +109,15 @@ def registrar_venta():
     return success_response(data, message, http_code)
 
 
-# ── 6. REPORTAR INCIDENCIA CON O SIN FOTOGRAFÍA ────────────────────────────────
+# ── 6. INCIDENCIAS DEL IMPULSADOR ─────────────────────────────────────────────
+@impulsador_bp.route("/api/impulsador/incidencias/tipos", methods=["GET"])
+@jwt_required()
+def listar_tipos_incidencia():
+    service = ImpulsadorService()
+    data = service.obtener_tipos_incidencia()
+    return success_response(data, "Tipos de incidencia obtenidos exitosamente", 200)
+
+
 @impulsador_bp.route("/api/impulsador/incidencias", methods=["POST"])
 @jwt_required()
 def reportar_incidencia():
@@ -118,7 +126,7 @@ def reportar_incidencia():
     # Si viene como multipart/form-data
     if request.files:
         payload = request.form.to_dict()
-        foto = request.files.get("foto") or request.files.get("imagen")
+        foto = request.files.get("foto") or request.files.get("imagen") or request.files.get("archivo")
     else:
         payload = request.get_json(silent=True) or {}
         foto = None
@@ -133,6 +141,42 @@ def reportar_incidencia():
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
+
+
+@impulsador_bp.route("/api/impulsador/incidencias", methods=["GET"])
+@jwt_required()
+def listar_incidencias():
+    idUsuario = get_jwt_identity()
+    estado = request.args.get("estado")
+    service = ImpulsadorService()
+    data, message, http_code = service.listar_incidencias(idUsuario=idUsuario, estado=estado)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@impulsador_bp.route("/api/impulsador/incidencias/<int:idIncidencias>", methods=["GET"])
+@jwt_required()
+def detalle_incidencia(idIncidencias):
+    idUsuario = get_jwt_identity()
+    service = ImpulsadorService()
+    data, message, http_code = service.obtener_detalle_incidencia(idIncidencias=idIncidencias, idUsuario=idUsuario)
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@impulsador_bp.route("/api/impulsador/incidencias/<int:idIncidencias>/foto", methods=["GET"])
+@jwt_required(optional=True)
+def foto_incidencia(idIncidencias):
+    service = ImpulsadorService()
+    file_path, message, http_code = service.obtener_ruta_foto_incidencia(idIncidencias)
+
+    if not file_path:
+        return error_response(message, http_code)
+    return send_file(file_path)
 
 
 # ── 7. REPONER STOCK DE PRODUCTO EN EL LOCAL ──────────────────────────────────

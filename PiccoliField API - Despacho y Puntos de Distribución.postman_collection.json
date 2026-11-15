@@ -694,6 +694,97 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Ver stock actual de productos en punto de venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/puntos-venta/1/stock",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "stock"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar incidencias (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/incidencias",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de incidencia (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/supervision/incidencias/1",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atender / Resolver incidencia (Supervisión)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"estado\": \"RESUELTO\",\n    \"comentario\": \"Se coordinó con logística y se enviaron 2 botellas de reemplazo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/supervision/incidencias/1/atender",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1",
+                "atender"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     },
@@ -799,6 +890,94 @@
                 "impulsador",
                 "stock",
                 "reponer"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Tipos de incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias/tipos",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "tipos"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar incidencia (con o sin foto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo\": \"PRODUCTO_DANADO\",\n    \"severidad\": \"ALTA\",\n    \"descripcion\": \"2 botellas de cóctel llegaron rotas en la caja de despacho\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar mis incidencias reportadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de una incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias/1",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "1"
               ]
             }
           },

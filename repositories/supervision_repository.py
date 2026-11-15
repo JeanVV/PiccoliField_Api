@@ -51,10 +51,15 @@ class SupervisionRepository:
             cursor.execute("SELECT COUNT(*) AS alertas_pendientes FROM ALERTAS_STOCK WHERE estado = 'PENDIENTE'")
             alertas = cursor.fetchone()['alertas_pendientes']
             
+            # Incidencias Abiertas
+            cursor.execute("SELECT COUNT(*) AS incidencias_abiertas FROM INCIDENCIAS WHERE estado = 'ABIERTO'")
+            incidencias = cursor.fetchone()['incidencias_abiertas']
+
             return {
                 "monto_total_ventas": float(monto),
                 "cantidad_pdv_activos": pdv,
-                "cantidad_alertas": alertas
+                "cantidad_alertas": alertas,
+                "cantidad_incidencias_abiertas": incidencias
             }
         finally:
             cursor.close()
@@ -325,7 +330,7 @@ class SupervisionRepository:
             if not pdv:
                 return None
 
-            # Productos asociados a este punto de venta con su imagen y stock mínimo
+            # Productos asociados a este punto de venta con stock actual, stock mínimo y precio
             sql_productos = """
                 SELECT 
                     p.idProductos,
@@ -336,7 +341,14 @@ class SupervisionRepository:
                     p.descripcion,
                     p.url_foto,
                     p.estado,
-                    pdvp.stock_minimo
+                    pdvp.stock_actual,
+                    pdvp.stock_minimo,
+                    p.precio,
+                    CASE 
+                        WHEN pdvp.stock_actual = 0 THEN 'AGOTADO'
+                        WHEN pdvp.stock_actual <= pdvp.stock_minimo THEN 'BAJO'
+                        ELSE 'OPTIMO'
+                    END AS estado_stock
                 FROM PDV_PRODUCTOS pdvp
                 INNER JOIN PRODUCTOS p ON pdvp.idProductos = p.idProductos
                 WHERE pdvp.idPuntosVenta = %s AND p.estado = 'ACTIVO'
@@ -910,5 +922,133 @@ class SupervisionRepository:
         except Exception as e:
             print(f"Error en obtener_historial_asignaciones_usuario: {e}")
             return None, "Error interno al obtener historial de asignaciones", 500
+        finally:
+            cursor.close()
+
+    # ── 8. GESTIÓN DE INCIDENCIAS (SUPERVISIÓN) ────────────────────────────────
+    def listar_incidencias(self, estado=None, idPuntosVenta=None, severidad=None):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    i.idIncidencias,
+                    i.idIncidencias AS idIncidencia,
+                    i.tipo,
+                    i.severidad,
+                    i.descripcion,
+                    i.estado,
+                    DATE_FORMAT(i.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    i.comentario_atencion,
+                    DATE_FORMAT(i.fecha_atencion, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_atencion,
+                    i.idUsuario,
+                    CONCAT(u.nombres, ' ', u.apePaterno) AS impulsador_nombre,
+                    u.correo AS impulsador_correo,
+                    pv.idPuntosVenta,
+                    pv.puntoVenta AS local_nombre,
+                    pv.direccion AS local_direccion,
+                    e.idEvidencias,
+                    e.ruta_archivo AS ruta_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL THEN 1 ELSE 0 END AS tiene_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL 
+                         THEN CONCAT('/api/impulsador/incidencias/', i.idIncidencias, '/foto')
+                         ELSE NULL 
+                    END AS url_foto_evidencia
+                FROM INCIDENCIAS i
+                INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN USUARIOS u ON i.idUsuario = u.idUsuario
+                LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE 1=1
+            """
+            params = []
+            if estado:
+                sql += " AND i.estado = %s"
+                params.append(estado.strip().upper())
+            if idPuntosVenta:
+                sql += " AND i.idPuntosVenta = %s"
+                params.append(idPuntosVenta)
+            if severidad:
+                sql += " AND i.severidad = %s"
+                params.append(severidad.strip().upper())
+
+            sql += " ORDER BY i.fecha_registro DESC"
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchall()
+        except Exception as e:
+            print(f"Error en listar_incidencias supervision: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    i.idIncidencias,
+                    i.idIncidencias AS idIncidencia,
+                    i.tipo,
+                    i.severidad,
+                    i.descripcion,
+                    i.estado,
+                    DATE_FORMAT(i.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    i.comentario_atencion,
+                    DATE_FORMAT(i.fecha_atencion, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_atencion,
+                    i.idUsuario,
+                    CONCAT(u.nombres, ' ', u.apePaterno, ' ', u.apeMaterno) AS impulsador_nombre,
+                    u.correo AS impulsador_correo,
+                    u.url_foto AS impulsador_foto,
+                    pv.idPuntosVenta,
+                    pv.puntoVenta AS local_nombre,
+                    pv.direccion AS local_direccion,
+                    e.idEvidencias,
+                    e.ruta_archivo AS ruta_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL THEN 1 ELSE 0 END AS tiene_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL 
+                         THEN CONCAT('/api/impulsador/incidencias/', i.idIncidencias, '/foto')
+                         ELSE NULL 
+                    END AS url_foto_evidencia
+                FROM INCIDENCIAS i
+                INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN USUARIOS u ON i.idUsuario = u.idUsuario
+                LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE i.idIncidencias = %s
+                LIMIT 1
+            """
+            cursor.execute(sql, (idIncidencias,))
+            return cursor.fetchone()
+        except Exception as e:
+            print(f"Error en obtener_detalle_incidencia supervision: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def atender_incidencia(self, idIncidencias, nuevo_estado="RESUELTO", comentario_atencion=None):
+        cursor = self.connection.cursor()
+        try:
+            nuevo_estado = (nuevo_estado or "RESUELTO").strip().upper()
+            if nuevo_estado not in ("ABIERTO", "EN_PROCESO", "RESUELTO"):
+                return None, "Estado inválido. Debe ser 'EN_PROCESO' o 'RESUELTO'", 400
+
+            cursor.execute("SELECT idIncidencias FROM INCIDENCIAS WHERE idIncidencias = %s LIMIT 1", (idIncidencias,))
+            if not cursor.fetchone():
+                return None, "Incidencia no encontrada", 404
+
+            cursor.execute("""
+                UPDATE INCIDENCIAS
+                SET estado = %s,
+                    fecha_atencion = NOW(),
+                    comentario_atencion = %s
+                WHERE idIncidencias = %s
+            """, (nuevo_estado, comentario_atencion, idIncidencias))
+
+            self.connection.commit()
+
+            # Devolver el detalle actualizado
+            detalle_actualizado = self.obtener_detalle_incidencia(idIncidencias)
+            return detalle_actualizado, f"Incidencia marcada como {nuevo_estado} exitosamente", 200
+        except Exception as e:
+            self.connection.rollback()
+            print(f"Error en atender_incidencia supervision: {e}")
+            raise e
         finally:
             cursor.close()

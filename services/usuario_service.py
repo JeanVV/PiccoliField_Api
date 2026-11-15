@@ -40,19 +40,72 @@ class UsuarioService:
             connection.close()
 
     # ── PUT /api/perfil/fcm-token ────────────────────────────────────────────
-    def actualizar_fcm_token(self, idUsuario, fcm_token, id_dispositivo):
-        if not fcm_token or not id_dispositivo:
-            return None, "fcm_token e id_dispositivo son requeridos", 400
+    def actualizar_fcm_token(self, idUsuario, fcm_token, id_dispositivo=None):
+        if not fcm_token:
+            return None, "El campo 'fcm_token' es requerido", 400
 
         connection = get_connection()
         try:
             repository = UsuarioRepository(connection)
-            rows = repository.actualizar_fcm_token(idUsuario, fcm_token, id_dispositivo)
+            repository.actualizar_fcm_token(idUsuario, fcm_token, id_dispositivo)
+            return {
+                "idUsuario": int(idUsuario),
+                "fcm_token": fcm_token
+            }, "Token FCM actualizado correctamente", 200
+        except Exception as e:
+            print(f"Error al actualizar FCM token: {e}")
+            return None, f"Error interno: {str(e)}", 500
+        finally:
+            connection.close()
 
-            if rows == 0:
-                return None, "Usuario no encontrado", 404
+    # ── GET /api/notificaciones ──────────────────────────────────────────────
+    MAPA_TIPOS_APP = {
+        "ALERTA_STOCK": ("ALERTA", "⚠️ Alerta de Stock Bajo"),
+        "INCIDENCIA_NUEVA": ("INCIDENCIA", "🚨 Nueva Incidencia"),
+        "INCIDENCIA_RESUELTA": ("INCIDENCIA", "✅ Incidencia Resuelta"),
+        "META_ALCANZADA": ("META", "🎉 ¡Meta Alcanzada!"),
+        "REASIGNACION_LOCAL": ("REASIGNACION", "📍 Reasignación de Local"),
+    }
 
-            return {"idUsuario": idUsuario}, "Token FCM actualizado correctamente", 200
+    def listar_notificaciones(self, idUsuario, limite=20):
+        connection = get_connection()
+        try:
+            repository = UsuarioRepository(connection)
+            filas = repository.listar_notificaciones(idUsuario, limite) or []
+            notificaciones = []
+            for f in filas:
+                t_orig = f.get("tipo", "GENERAL")
+                tipo_app, titulo_default = self.MAPA_TIPOS_APP.get(t_orig, ("GENERAL", "ℹ️ Notificación"))
+
+                # Extraer ID numérico de referencia (ej: INC-35 -> "35", ALERTA-10 -> "10")
+                ref = str(f.get("referencia") or "")
+                content_id = ""
+                if "-" in ref:
+                    partes = ref.split("-", 1)
+                    content_id = partes[1]
+                elif ref.isdigit():
+                    content_id = ref
+                else:
+                    content_id = str(f.get("idNotificacion"))
+
+                notificaciones.append({
+                    "idNotificacion": f["idNotificacion"],
+                    "tipo": tipo_app,
+                    "tipo_original": t_orig,
+                    "id": content_id,
+                    "titulo": titulo_default,
+                    "mensaje": f.get("mensaje", ""),
+                    "referencia": ref,
+                    "fecha": f.get("fecha", "")
+                })
+
+            return {
+                "total": len(notificaciones),
+                "notificaciones": notificaciones
+            }, "Historial de notificaciones obtenido exitosamente", 200
+        except Exception as e:
+            print(f"Error en listar_notificaciones: {e}")
+            return None, f"Error interno: {str(e)}", 500
         finally:
             connection.close()
 

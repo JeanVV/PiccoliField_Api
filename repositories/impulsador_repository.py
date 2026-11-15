@@ -426,6 +426,8 @@ class ImpulsadorRepository:
             meta_val = float(row_meta.get("meta_ventas") or 0.0)
             monto_mes = float(row_meta.get("total_vendido_mes") or subtotal)
             pct_meta = round((monto_mes / meta_val) * 100, 2) if meta_val > 0 else 0.0
+            monto_previo = monto_mes - subtotal
+            meta_alcanzada = bool(meta_val > 0 and monto_mes >= meta_val and monto_previo < meta_val)
 
             self.connection.commit()
 
@@ -445,7 +447,8 @@ class ImpulsadorRepository:
                 "avance_meta": {
                     "meta_mensual": meta_val,
                     "total_vendido_mes": monto_mes,
-                    "porcentaje_cumplimiento": pct_meta
+                    "porcentaje_cumplimiento": pct_meta,
+                    "meta_alcanzada": meta_alcanzada
                 }
             }
 
@@ -461,7 +464,58 @@ class ImpulsadorRepository:
         finally:
             cursor.close()
 
-    # ── 5. REPORTAR INCIDENCIA ─────────────────────────────────────────────────
+    # ── 5. INCIDENCIAS ────────────────────────────────────────────────────────
+    TIPOS_INCIDENCIA = [
+        {
+            "tipo": "Producto dañado o vencido",
+            "codigo": "PRODUCTO_DANADO",
+            "nombre": "Producto dañado o vencido",
+            "descripcion": "Mercadería rota, dañada, vencida o con empaque defectuoso",
+            "severidad_sugerida": "ALTA"
+        },
+        {
+            "tipo": "Exhibición incorrecta",
+            "codigo": "EXHIBICION_INCORRECTA",
+            "nombre": "Exhibición incorrecta",
+            "descripcion": "El local no respetó el espacio acordado o la exhibición se encuentra desordenada",
+            "severidad_sugerida": "BAJA"
+        },
+        {
+            "tipo": "Acceso o seguridad",
+            "codigo": "ACCESO_SEGURIDAD",
+            "nombre": "Acceso o seguridad",
+            "descripcion": "Inconvenientes de ingreso, diferencias de inventario o problemas de seguridad",
+            "severidad_sugerida": "ALTA"
+        },
+        {
+            "tipo": "Problema de personal",
+            "codigo": "PROBLEMA_PERSONAL",
+            "nombre": "Problema de personal",
+            "descripcion": "Ausencia de personal de apoyo, mala disposición o quejas del encargado",
+            "severidad_sugerida": "MEDIA"
+        },
+        {
+            "tipo": "Actividad de la competencia",
+            "codigo": "ACTIVIDAD_COMPETENCIA",
+            "nombre": "Actividad de la competencia",
+            "descripcion": "Acciones agresivas de marcas competidoras, ocupación de espacio o promociones",
+            "severidad_sugerida": "MEDIA"
+        },
+        {
+            "tipo": "Otro",
+            "codigo": "OTRO",
+            "nombre": "Otro",
+            "descripcion": "Cualquier otra eventualidad (cortes de luz, reclamos de clientes, etc.)",
+            "severidad_sugerida": "MEDIA"
+        }
+    ]
+
+    def listar_tipos_incidencia(self):
+        return {
+            "tipos": self.TIPOS_INCIDENCIA,
+            "severidades": ["BAJA", "MEDIA", "ALTA"]
+        }
+
     def registrar_incidencia(self, idUsuario, idPuntosVenta, tipo, severidad, descripcion, ruta_evidencia=None, hash_sha=None):
         cursor = self.connection.cursor()
         try:
@@ -488,27 +542,127 @@ class ImpulsadorRepository:
                         tipo,
                         fecha_captura,
                         idIncidencias
-                    ) VALUES (%s, %s, %s, NOW(), %s)
+                    ) VALUES (%s, %s, 'INCIDENCIA', NOW(), %s)
                 """
-                cursor.execute(sql_evidencia, (ruta_evidencia, hash_sha, tipo, idIncidencias))
+                cursor.execute(sql_evidencia, (ruta_evidencia, hash_sha, idIncidencias))
                 idEvidencia = cursor.lastrowid
 
             self.connection.commit()
 
             return {
                 "idIncidencias": idIncidencias,
+                "idIncidencia": idIncidencias,
                 "tipo": tipo,
                 "severidad": severidad or "MEDIA",
                 "descripcion": descripcion,
                 "estado": "ABIERTO",
                 "idPuntosVenta": idPuntosVenta,
                 "idEvidencia": idEvidencia,
-                "tiene_foto": bool(ruta_evidencia)
+                "tiene_foto": bool(ruta_evidencia),
+                "url_foto_evidencia": f"/api/impulsador/incidencias/{idIncidencias}/foto" if ruta_evidencia else None
             }, "Incidencia reportada exitosamente", 201
 
         except Exception as e:
             self.connection.rollback()
             raise e
+        finally:
+            cursor.close()
+
+    def listar_incidencias_impulsador(self, idUsuario, estado=None):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    i.idIncidencias,
+                    i.idIncidencias AS idIncidencia,
+                    i.tipo,
+                    i.severidad,
+                    i.descripcion,
+                    i.estado,
+                    DATE_FORMAT(i.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    i.comentario_atencion,
+                    DATE_FORMAT(i.fecha_atencion, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_atencion,
+                    pv.idPuntosVenta,
+                    pv.puntoVenta AS local_nombre,
+                    pv.direccion AS local_direccion,
+                    e.idEvidencias,
+                    e.ruta_archivo AS ruta_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL THEN 1 ELSE 0 END AS tiene_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL 
+                         THEN CONCAT('/api/impulsador/incidencias/', i.idIncidencias, '/foto')
+                         ELSE NULL 
+                    END AS url_foto_evidencia
+                FROM INCIDENCIAS i
+                INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
+                LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE i.idUsuario = %s
+            """
+            params = [idUsuario]
+            if estado:
+                sql += " AND i.estado = %s"
+                params.append(estado.strip().upper())
+
+            sql += " ORDER BY i.fecha_registro DESC"
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchall()
+        finally:
+            cursor.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias, idUsuario=None):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    i.idIncidencias,
+                    i.idIncidencias AS idIncidencia,
+                    i.tipo,
+                    i.severidad,
+                    i.descripcion,
+                    i.estado,
+                    DATE_FORMAT(i.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    i.comentario_atencion,
+                    DATE_FORMAT(i.fecha_atencion, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_atencion,
+                    i.idUsuario,
+                    CONCAT(u.nombres, ' ', u.apePaterno) AS reportado_por,
+                    pv.idPuntosVenta,
+                    pv.puntoVenta AS local_nombre,
+                    pv.direccion AS local_direccion,
+                    e.idEvidencias,
+                    e.ruta_archivo AS ruta_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL THEN 1 ELSE 0 END AS tiene_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL 
+                         THEN CONCAT('/api/impulsador/incidencias/', i.idIncidencias, '/foto')
+                         ELSE NULL 
+                    END AS url_foto_evidencia
+                FROM INCIDENCIAS i
+                INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN USUARIOS u ON i.idUsuario = u.idUsuario
+                LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE i.idIncidencias = %s
+            """
+            params = [idIncidencias]
+            if idUsuario:
+                sql += " AND i.idUsuario = %s"
+                params.append(idUsuario)
+
+            sql += " LIMIT 1"
+            cursor.execute(sql, tuple(params))
+            return cursor.fetchone()
+        finally:
+            cursor.close()
+
+    def obtener_ruta_foto_incidencia(self, idIncidencias):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT e.ruta_archivo 
+                FROM EVIDENCIAS e
+                WHERE e.idIncidencias = %s
+                LIMIT 1
+            """
+            cursor.execute(sql, (idIncidencias,))
+            row = cursor.fetchone()
+            return row["ruta_archivo"] if row else None
         finally:
             cursor.close()
 
@@ -615,7 +769,7 @@ class ImpulsadorRepository:
                         tipo,
                         fecha_captura,
                         idStock
-                    ) VALUES (%s, %s, 'REPOSICION_STOCK', NOW(), %s)
+                    ) VALUES (%s, %s, 'EXHIBICION', NOW(), %s)
                 """, (ruta_evidencia, hash_sha, idStock))
                 idEvidencia = cursor.lastrowid
 

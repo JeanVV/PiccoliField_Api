@@ -203,6 +203,34 @@ class ImpulsadorService:
                 cantidad=cantidad
             )
 
+            # Si la venta disparó alerta de stock bajo/agotado, notificar a los promotores
+            if http_code == 201 and resultado and resultado.get("alerta_generada"):
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_alerta_stock(
+                        idPuntosVenta=idPuntosVenta,
+                        idProductos=idProductos,
+                        stock_actual=resultado.get("stock_actual", 0),
+                        stock_minimo=resultado.get("stock_minimo", 0),
+                        idAlerta=resultado.get("idAlerta")
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar alerta stock: {ex_fcm}")
+
+            # Si con esta venta el impulsador alcanzó su meta mensual, notificarle
+            avance = (resultado.get("avance_meta") or {}) if resultado else {}
+            if http_code == 201 and avance.get("meta_alcanzada"):
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_meta_alcanzada(
+                        idUsuario=idUsuario,
+                        meta_ventas=avance.get("meta_mensual", 0),
+                        total_vendido=avance.get("total_vendido_mes", 0),
+                        pct=avance.get("porcentaje_cumplimiento", 100.0)
+                    )
+                except Exception as ex_meta:
+                    print(f"[FCM] Error no bloqueante al notificar meta alcanzada: {ex_meta}")
+
             return resultado, mensaje, http_code
 
         except Exception as e:
@@ -211,9 +239,40 @@ class ImpulsadorService:
         finally:
             connection.close()
 
-    # ── 6. REPORTAR INCIDENCIA ─────────────────────────────────────────────────
+    # ── 6. INCIDENCIAS ─────────────────────────────────────────────────────────
+    MAPA_TIPOS_INCIDENCIA = {
+        "PRODUCTO DAÑADO O VENCIDO": "Producto dañado o vencido",
+        "PRODUCTO DANADO O VENCIDO": "Producto dañado o vencido",
+        "PRODUCTO_DANADO": "Producto dañado o vencido",
+        "PRODUCTO_DANADO_VENCIDO": "Producto dañado o vencido",
+        "EXHIBICIÓN INCORRECTA": "Exhibición incorrecta",
+        "EXHIBICION INCORRECTA": "Exhibición incorrecta",
+        "EXHIBICION_INCORRECTA": "Exhibición incorrecta",
+        "PROBLEMA_ESPACIO": "Exhibición incorrecta",
+        "ACCESO O SEGURIDAD": "Acceso o seguridad",
+        "ACCESO_SEGURIDAD": "Acceso o seguridad",
+        "PROBLEMA DE PERSONAL": "Problema de personal",
+        "PROBLEMA_PERSONAL": "Problema de personal",
+        "CLIMA_LOCAL": "Problema de personal",
+        "ACTIVIDAD DE LA COMPETENCIA": "Actividad de la competencia",
+        "ACTIVIDAD_COMPETENCIA": "Actividad de la competencia",
+        "OTRO": "Otro",
+        "QUIEBRE_STOCK": "Otro",
+        "DISCREPANCIA_PRECIO": "Otro",
+        "MATERIAL_POP_DANADO": "Exhibición incorrecta"
+    }
+
+    def obtener_tipos_incidencia(self):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            return repo.listar_tipos_incidencia()
+        finally:
+            connection.close()
+
     def reportar_incidencia(self, idUsuario, payload, archivo_foto=None):
-        tipo = str(payload.get("tipo", "")).strip().upper()
+        raw_tipo = str(payload.get("tipo", "")).strip()
+        tipo = self.MAPA_TIPOS_INCIDENCIA.get(raw_tipo.upper(), raw_tipo)
         severidad = str(payload.get("severidad", "MEDIA")).strip().upper()
         descripcion = str(payload.get("descripcion", "")).strip()
         idPuntosVenta = payload.get("idPuntosVenta")
@@ -277,11 +336,77 @@ class ImpulsadorService:
                 hash_sha=hash_sha
             )
 
+            # Si la incidencia se registró exitosamente, notificar al promotor asignado al PDV
+            if http_code == 201 and resultado:
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_nueva_incidencia(
+                        idPuntosVenta=idPuntosVenta,
+                        tipo_incidencia=tipo,
+                        severidad=severidad,
+                        descripcion=descripcion,
+                        idIncidencias=resultado.get("idIncidencias"),
+                        idUsuarioReporta=idUsuario
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar nueva incidencia: {ex_fcm}")
+
             return resultado, mensaje, http_code
 
         except Exception as e:
             print(f"Error en reportar_incidencia: {e}")
             return None, f"Error interno al reportar incidencia: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def listar_incidencias(self, idUsuario, estado=None):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            data = repo.listar_incidencias_impulsador(idUsuario=idUsuario, estado=estado)
+            return data, "Incidencias obtenidas exitosamente", 200
+        except Exception as e:
+            print(f"Error en listar_incidencias: {e}")
+            return None, f"Error interno: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias, idUsuario=None):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            data = repo.obtener_detalle_incidencia(idIncidencias=idIncidencias, idUsuario=idUsuario)
+            if not data:
+                return None, "Incidencia no encontrada", 404
+            return data, "Detalle de incidencia obtenido exitosamente", 200
+        except Exception as e:
+            print(f"Error en obtener_detalle_incidencia: {e}")
+            return None, f"Error interno: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def obtener_ruta_foto_incidencia(self, idIncidencias):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            ruta_relativa = repo.obtener_ruta_foto_incidencia(idIncidencias)
+            if not ruta_relativa:
+                return None, "La incidencia no tiene fotografía registrada", 404
+
+            nombre_archivo = os.path.basename(ruta_relativa)
+            evidencias_dir = getattr(Config, "EVIDENCIAS_DIR", os.path.join(BASE_DIR, "uploads", "evidencias"))
+            ruta_directa = os.path.join(evidencias_dir, nombre_archivo)
+            if os.path.isfile(ruta_directa):
+                return ruta_directa, "Foto encontrada", 200
+
+            ruta_completa = os.path.join(BASE_DIR, ruta_relativa)
+            if os.path.isfile(ruta_completa):
+                return ruta_completa, "Foto encontrada", 200
+
+            return None, "Archivo de foto no encontrado en el servidor", 404
+        except Exception as e:
+            print(f"Error en obtener_ruta_foto_incidencia: {e}")
+            return None, "Error interno", 500
         finally:
             connection.close()
 
