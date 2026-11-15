@@ -253,3 +253,43 @@ class SupervisionService:
             return None, "Error interno al obtener historial de asignaciones", 500
         finally:
             connection.close()
+
+    def obtener_stock_punto_venta(self, idPuntosVenta):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            pdv = repo.obtener_detalle_punto_venta(idPuntosVenta)
+            if not pdv:
+                return None, "Punto de venta no encontrado o no es de tipo VENTA", 404
+            return pdv.get("productos", []), "Stock del punto de venta obtenido exitosamente", 200
+        except Exception as e:
+            print(f"Error stock punto venta: {e}")
+            return None, "Error interno", 500
+        finally:
+            connection.close()
+
+    def listar_incidencias(self, estado=None):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data = repo.listar_incidencias(estado)
+            if data is None:
+                return None, "Error interno al obtener incidencias", 500
+            return data, "Incidencias obtenidas exitosamente", 200
+        except Exception as e:
+            print(f"Error listar incidencias supervision: {e}")
+            return None, "Error interno", 500
+        finally:
+            connection.close()
+
+    def atender_incidencia(self, idIncidencias, nuevo_estado, comentario_atencion=None):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data, message, http_code = repo.atender_incidencia(idIncidencias, nuevo_estado, comentario_atencion)
+            return data, message, http_code
+        except Exception as e:
+            print(f"Error atender incidencia: {e}")
+            return None, "Error interno", 500
+        finally:
+            connection.close()

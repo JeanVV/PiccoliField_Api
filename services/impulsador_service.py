@@ -211,7 +211,15 @@ class ImpulsadorService:
         finally:
             connection.close()
 
-    # ── 6. REPORTAR INCIDENCIA ─────────────────────────────────────────────────
+    # ── 6. INCIDENCIAS ─────────────────────────────────────────────────────────
+    def obtener_tipos_incidencia(self):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            return repo.listar_tipos_incidencia()
+        finally:
+            connection.close()
+
     def reportar_incidencia(self, idUsuario, payload, archivo_foto=None):
         tipo = str(payload.get("tipo", "")).strip().upper()
         severidad = str(payload.get("severidad", "MEDIA")).strip().upper()
@@ -282,6 +290,57 @@ class ImpulsadorService:
         except Exception as e:
             print(f"Error en reportar_incidencia: {e}")
             return None, f"Error interno al reportar incidencia: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def listar_incidencias(self, idUsuario, estado=None):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            data = repo.listar_incidencias_impulsador(idUsuario=idUsuario, estado=estado)
+            return data, "Incidencias obtenidas exitosamente", 200
+        except Exception as e:
+            print(f"Error en listar_incidencias: {e}")
+            return None, f"Error interno: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias, idUsuario=None):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            data = repo.obtener_detalle_incidencia(idIncidencias=idIncidencias, idUsuario=idUsuario)
+            if not data:
+                return None, "Incidencia no encontrada", 404
+            return data, "Detalle de incidencia obtenido exitosamente", 200
+        except Exception as e:
+            print(f"Error en obtener_detalle_incidencia: {e}")
+            return None, f"Error interno: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def obtener_ruta_foto_incidencia(self, idIncidencias):
+        connection = get_connection()
+        try:
+            repo = ImpulsadorRepository(connection)
+            ruta_relativa = repo.obtener_ruta_foto_incidencia(idIncidencias)
+            if not ruta_relativa:
+                return None, "La incidencia no tiene fotografía registrada", 404
+
+            nombre_archivo = os.path.basename(ruta_relativa)
+            evidencias_dir = getattr(Config, "EVIDENCIAS_DIR", os.path.join(BASE_DIR, "uploads", "evidencias"))
+            ruta_directa = os.path.join(evidencias_dir, nombre_archivo)
+            if os.path.isfile(ruta_directa):
+                return ruta_directa, "Foto encontrada", 200
+
+            ruta_completa = os.path.join(BASE_DIR, ruta_relativa)
+            if os.path.isfile(ruta_completa):
+                return ruta_completa, "Foto encontrada", 200
+
+            return None, "Archivo de foto no encontrado en el servidor", 404
+        except Exception as e:
+            print(f"Error en obtener_ruta_foto_incidencia: {e}")
+            return None, "Error interno", 500
         finally:
             connection.close()
 

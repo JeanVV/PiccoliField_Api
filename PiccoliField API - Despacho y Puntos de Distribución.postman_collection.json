@@ -803,6 +803,94 @@
             }
           },
           "response": []
+        },
+        {
+          "name": "Tipos de incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias/tipos",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "tipos"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar incidencia (con o sin foto)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tipo\": \"PRODUCTO_DANADO\",\n    \"severidad\": \"ALTA\",\n    \"descripcion\": \"2 botellas de cóctel llegaron rotas en la caja de despacho\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar mis incidencias reportadas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de una incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/impulsador/incidencias/1",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "1"
+              ]
+            }
+          },
+          "response": []
         }
       ]
     }
