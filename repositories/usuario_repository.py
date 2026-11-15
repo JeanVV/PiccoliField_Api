@@ -66,3 +66,25 @@ class UsuarioRepository:
             return cursor.rowcount
         finally:
             cursor.close()
+
+    def actualizar_foto(self, id_usuario, url_foto):
+        cursor = self.connection.cursor()
+        try:
+            try:
+                cursor.execute(
+                    "UPDATE USUARIOS SET url_foto = %s WHERE idUsuario = %s",
+                    (url_foto, id_usuario)
+                )
+                self.connection.commit()
+                return url_foto
+            except Exception:
+                self.connection.rollback()
+                ruta_corta = f"uploads/perfiles/user_{id_usuario}.jpg"
+                cursor.execute(
+                    "UPDATE USUARIOS SET url_foto = %s WHERE idUsuario = %s",
+                    (ruta_corta, id_usuario)
+                )
+                self.connection.commit()
+                return ruta_corta
+        finally:
+            cursor.close()
