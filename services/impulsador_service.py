@@ -212,6 +212,28 @@ class ImpulsadorService:
             connection.close()
 
     # ── 6. INCIDENCIAS ─────────────────────────────────────────────────────────
+    MAPA_TIPOS_INCIDENCIA = {
+        "PRODUCTO DAÑADO O VENCIDO": "Producto dañado o vencido",
+        "PRODUCTO DANADO O VENCIDO": "Producto dañado o vencido",
+        "PRODUCTO_DANADO": "Producto dañado o vencido",
+        "PRODUCTO_DANADO_VENCIDO": "Producto dañado o vencido",
+        "EXHIBICIÓN INCORRECTA": "Exhibición incorrecta",
+        "EXHIBICION INCORRECTA": "Exhibición incorrecta",
+        "EXHIBICION_INCORRECTA": "Exhibición incorrecta",
+        "PROBLEMA_ESPACIO": "Exhibición incorrecta",
+        "ACCESO O SEGURIDAD": "Acceso o seguridad",
+        "ACCESO_SEGURIDAD": "Acceso o seguridad",
+        "PROBLEMA DE PERSONAL": "Problema de personal",
+        "PROBLEMA_PERSONAL": "Problema de personal",
+        "CLIMA_LOCAL": "Problema de personal",
+        "ACTIVIDAD DE LA COMPETENCIA": "Actividad de la competencia",
+        "ACTIVIDAD_COMPETENCIA": "Actividad de la competencia",
+        "OTRO": "Otro",
+        "QUIEBRE_STOCK": "Otro",
+        "DISCREPANCIA_PRECIO": "Otro",
+        "MATERIAL_POP_DANADO": "Exhibición incorrecta"
+    }
+
     def obtener_tipos_incidencia(self):
         connection = get_connection()
         try:
@@ -221,7 +243,8 @@ class ImpulsadorService:
             connection.close()
 
     def reportar_incidencia(self, idUsuario, payload, archivo_foto=None):
-        tipo = str(payload.get("tipo", "")).strip().upper()
+        raw_tipo = str(payload.get("tipo", "")).strip()
+        tipo = self.MAPA_TIPOS_INCIDENCIA.get(raw_tipo.upper(), raw_tipo)
         severidad = str(payload.get("severidad", "MEDIA")).strip().upper()
         descripcion = str(payload.get("descripcion", "")).strip()
         idPuntosVenta = payload.get("idPuntosVenta")

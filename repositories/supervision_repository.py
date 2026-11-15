@@ -1052,4 +1052,3 @@ class SupervisionRepository:
             raise e
         finally:
             cursor.close()
-            cursor.close()

@@ -464,46 +464,46 @@ class ImpulsadorRepository:
     # ── 5. INCIDENCIAS ────────────────────────────────────────────────────────
     TIPOS_INCIDENCIA = [
         {
-            "tipo": "PRODUCTO_DANADO",
-            "nombre": "Producto Dañado / Roto",
+            "tipo": "Producto dañado o vencido",
+            "codigo": "PRODUCTO_DANADO",
+            "nombre": "Producto dañado o vencido",
             "descripcion": "Mercadería rota, dañada, vencida o con empaque defectuoso",
             "severidad_sugerida": "ALTA"
         },
         {
-            "tipo": "QUIEBRE_STOCK",
-            "nombre": "Quiebre de Stock / Faltante",
-            "descripcion": "Falta de producto físico en góndola o almacén del local",
+            "tipo": "Exhibición incorrecta",
+            "codigo": "EXHIBICION_INCORRECTA",
+            "nombre": "Exhibición incorrecta",
+            "descripcion": "El local no respetó el espacio acordado o la exhibición se encuentra desordenada",
+            "severidad_sugerida": "BAJA"
+        },
+        {
+            "tipo": "Acceso o seguridad",
+            "codigo": "ACCESO_SEGURIDAD",
+            "nombre": "Acceso o seguridad",
+            "descripcion": "Inconvenientes de ingreso, diferencias de inventario o problemas de seguridad",
             "severidad_sugerida": "ALTA"
         },
         {
-            "tipo": "PROBLEMA_ESPACIO",
-            "nombre": "Espacio / Exhibición no Respetada",
-            "descripcion": "El local no respetó el espacio acordado para la exhibición de Piccoli",
+            "tipo": "Problema de personal",
+            "codigo": "PROBLEMA_PERSONAL",
+            "nombre": "Problema de personal",
+            "descripcion": "Ausencia de personal de apoyo, mala disposición o quejas del encargado",
             "severidad_sugerida": "MEDIA"
         },
         {
-            "tipo": "DISCREPANCIA_PRECIO",
-            "nombre": "Discrepancia de Precio",
-            "descripcion": "El precio exhibido en la tienda no coincide con el precio oficial",
+            "tipo": "Actividad de la competencia",
+            "codigo": "ACTIVIDAD_COMPETENCIA",
+            "nombre": "Actividad de la competencia",
+            "descripcion": "Acciones agresivas de marcas competidoras, ocupación de espacio o promociones",
             "severidad_sugerida": "MEDIA"
         },
         {
-            "tipo": "MATERIAL_POP_DANADO",
-            "nombre": "Material POP Dañado o Faltante",
-            "descripcion": "Afiches, habladores, jalavistas o material publicitario ausente o dañado",
-            "severidad_sugerida": "BAJA"
-        },
-        {
-            "tipo": "CLIMA_LOCAL",
-            "nombre": "Inconveniente con Encargado / Local",
-            "descripcion": "Problemas de acceso, mala disposición o quejas del administrador de la tienda",
+            "tipo": "Otro",
+            "codigo": "OTRO",
+            "nombre": "Otro",
+            "descripcion": "Cualquier otra eventualidad (cortes de luz, reclamos de clientes, etc.)",
             "severidad_sugerida": "MEDIA"
-        },
-        {
-            "tipo": "OTRO",
-            "nombre": "Otro Inconveniente",
-            "descripcion": "Cualquier otra eventualidad no descrita en las opciones anteriores",
-            "severidad_sugerida": "BAJA"
         }
     ]
 
@@ -539,9 +539,9 @@ class ImpulsadorRepository:
                         tipo,
                         fecha_captura,
                         idIncidencias
-                    ) VALUES (%s, %s, %s, NOW(), %s)
+                    ) VALUES (%s, %s, 'INCIDENCIA', NOW(), %s)
                 """
-                cursor.execute(sql_evidencia, (ruta_evidencia, hash_sha, tipo, idIncidencias))
+                cursor.execute(sql_evidencia, (ruta_evidencia, hash_sha, idIncidencias))
                 idEvidencia = cursor.lastrowid
 
             self.connection.commit()
@@ -766,7 +766,7 @@ class ImpulsadorRepository:
                         tipo,
                         fecha_captura,
                         idStock
-                    ) VALUES (%s, %s, 'REPOSICION_STOCK', NOW(), %s)
+                    ) VALUES (%s, %s, 'EXHIBICION', NOW(), %s)
                 """, (ruta_evidencia, hash_sha, idStock))
                 idEvidencia = cursor.lastrowid
 
