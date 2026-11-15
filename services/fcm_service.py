@@ -3,9 +3,28 @@ import glob
 import json
 import time
 import threading
-import requests
-from google.oauth2 import service_account
-import google.auth.transport.requests
+import urllib.request
+import urllib.parse
+import urllib.error
+
+# Intentar importar requests si está instalado; de lo contrario se usa urllib (nativo)
+try:
+    import requests
+except ImportError:
+    requests = None
+
+# PyJWT (instalado junto a Flask-JWT-Extended y cryptography)
+try:
+    import jwt
+except ImportError:
+    jwt = None
+
+# google-auth si está disponible
+try:
+    from google.oauth2 import service_account
+    import google.auth.transport.requests
+except ImportError:
+    service_account = None
 
 from config import BASE_DIR
 from database import get_connection
@@ -19,10 +38,31 @@ class FCMService:
     _project_id = None
 
     @classmethod
-    def _obtener_credenciales(cls):
-        if cls._credentials is not None and cls._project_id is not None:
-            return cls._credentials, cls._project_id
+    def _http_post_json(cls, url, headers, payload, timeout=8):
+        """
+        Envía un POST JSON compatible tanto con requests (si está disponible)
+        como con urllib.request (biblioteca estándar sin dependencias externas).
+        """
+        if requests is not None:
+            try:
+                resp = requests.post(url, headers=headers, json=payload, timeout=timeout)
+                return resp.status_code, resp.text
+            except Exception as e:
+                return 0, f"Error requests: {str(e)}"
+        else:
+            # Fallback nativo 100% estándar
+            json_bytes = json.dumps(payload).encode("utf-8")
+            req = urllib.request.Request(url, data=json_bytes, headers=headers, method="POST")
+            try:
+                with urllib.request.urlopen(req, timeout=timeout) as response:
+                    return response.status, response.read().decode("utf-8")
+            except urllib.error.HTTPError as e:
+                return e.code, e.read().decode("utf-8")
+            except Exception as e:
+                return 0, f"Error urllib: {str(e)}"
 
+    @classmethod
+    def _obtener_credenciales_archivo(cls):
         firebase_dir = os.path.join(BASE_DIR, "firebase")
         json_files = glob.glob(os.path.join(firebase_dir, "*.json"))
         if not json_files:
@@ -31,36 +71,80 @@ class FCMService:
         cred_path = json_files[0]
         try:
             with open(cred_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                cls._project_id = data.get("project_id", "piccolifield")
-
-            cls._credentials = service_account.Credentials.from_service_account_file(
-                cred_path, scopes=SCOPES
-            )
-            return cls._credentials, cls._project_id
+                key_data = json.load(f)
+            project_id = key_data.get("project_id", "piccolifield")
+            return cred_path, key_data
         except Exception as e:
-            print(f"[FCM] Error al cargar credenciales de servicio: {e}")
+            print(f"[FCM] Error al leer archivo de credenciales: {e}")
             return None, None
 
     @classmethod
     def _obtener_access_token(cls):
-        creds, project_id = cls._obtener_credenciales()
-        if not creds:
+        """
+        Obtiene o renueva el OAuth2 Access Token para Google FCM HTTP v1.
+        Soporta:
+        1. PyJWT + urllib (estándar, sin necesidad de google-auth o requests).
+        2. google.oauth2.service_account (si está instalado).
+        """
+        if cls._access_token and time.time() < (cls._token_expiry - 300):
+            return cls._access_token, cls._project_id
+
+        cred_path, key_data = cls._obtener_credenciales_archivo()
+        if not key_data:
             return None, None
 
-        # Si el token sigue vigente (con 5 min de margen)
-        if cls._access_token and time.time() < (cls._token_expiry - 300):
-            return cls._access_token, project_id
+        cls._project_id = key_data.get("project_id", "piccolifield")
 
-        try:
-            req = google.auth.transport.requests.Request()
-            creds.refresh(req)
-            cls._access_token = creds.token
-            cls._token_expiry = time.time() + 3600
-            return cls._access_token, project_id
-        except Exception as e:
-            print(f"[FCM] Error al renovar token OAuth2: {e}")
-            return None, project_id
+        # Opción 1: Generación nativa con PyJWT (disponible gracias a Flask-JWT-Extended y cryptography)
+        if jwt is not None and "private_key" in key_data:
+            try:
+                now = int(time.time())
+                payload = {
+                    "iss": key_data["client_email"],
+                    "scope": "https://www.googleapis.com/auth/firebase.messaging",
+                    "aud": key_data.get("token_uri", "https://oauth2.googleapis.com/token"),
+                    "exp": now + 3600,
+                    "iat": now
+                }
+                assertion = jwt.encode(payload, key_data["private_key"], algorithm="RS256")
+                token_url = key_data.get("token_uri", "https://oauth2.googleapis.com/token")
+
+                post_body = urllib.parse.urlencode({
+                    "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+                    "assertion": assertion
+                }).encode("utf-8")
+
+                req = urllib.request.Request(
+                    token_url,
+                    data=post_body,
+                    headers={"Content-Type": "application/x-www-form-urlencoded"},
+                    method="POST"
+                )
+
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    resp_data = json.loads(resp.read().decode("utf-8"))
+                    cls._access_token = resp_data.get("access_token")
+                    expires_in = int(resp_data.get("expires_in", 3600))
+                    cls._token_expiry = time.time() + expires_in
+                    return cls._access_token, cls._project_id
+            except Exception as e:
+                print(f"[FCM] Intento de firma nativa falló ({e}), probando google-auth si existe...")
+
+        # Opción 2: google-auth si está instalado
+        if service_account is not None and cred_path:
+            try:
+                creds = service_account.Credentials.from_service_account_file(
+                    cred_path, scopes=SCOPES
+                )
+                req = google.auth.transport.requests.Request()
+                creds.refresh(req)
+                cls._access_token = creds.token
+                cls._token_expiry = time.time() + 3600
+                return cls._access_token, cls._project_id
+            except Exception as e:
+                print(f"[FCM] Error al renovar token con google-auth: {e}")
+
+        return None, cls._project_id
 
     @classmethod
     def enviar_a_token(cls, fcm_token, titulo, mensaje, data=None):
@@ -102,14 +186,11 @@ class FCMService:
             }
         }
 
-        try:
-            resp = requests.post(url, headers=headers, json=payload, timeout=8)
-            if resp.status_code == 200:
-                return True, "Enviado con éxito"
-            else:
-                return False, f"FCM Error {resp.status_code}: {resp.text}"
-        except Exception as e:
-            return False, f"Excepción de conexión FCM: {str(e)}"
+        status_code, resp_text = cls._http_post_json(url, headers, payload, timeout=8)
+        if status_code == 200:
+            return True, "Enviado con éxito"
+        else:
+            return False, f"FCM Error {status_code}: {resp_text}"
 
     @classmethod
     def obtener_tokens_usuario(cls, idUsuario):
