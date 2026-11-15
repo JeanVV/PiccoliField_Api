@@ -326,8 +326,26 @@ def ignorar_alerta(idAlerta):
 @jwt_required()
 def listar_incidencias_supervision():
     estado = request.args.get("estado")
+    idPuntosVenta = request.args.get("idPuntosVenta", type=int)
+    severidad = request.args.get("severidad")
+
     service = SupervisionService()
-    data, message, http_code = service.listar_incidencias(estado=estado)
+    data, message, http_code = service.listar_incidencias(
+        estado=estado,
+        idPuntosVenta=idPuntosVenta,
+        severidad=severidad
+    )
+
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/incidencias/<int:idIncidencias>", methods=["GET"])
+@jwt_required()
+def detalle_incidencia_supervision(idIncidencias):
+    service = SupervisionService()
+    data, message, http_code = service.obtener_detalle_incidencia(idIncidencias)
 
     if data is None:
         return error_response(message, http_code)
@@ -351,3 +369,15 @@ def atender_incidencia(idIncidencias):
     if data is None:
         return error_response(message, http_code)
     return success_response(data, message, http_code)
+
+
+@supervision_bp.route("/api/supervision/incidencias/<int:idIncidencias>/foto", methods=["GET"])
+@jwt_required(optional=True)
+def foto_incidencia_supervision(idIncidencias):
+    from services.impulsador_service import ImpulsadorService
+    imp_service = ImpulsadorService()
+    file_path, message, http_code = imp_service.obtener_ruta_foto_incidencia(idIncidencias)
+
+    if not file_path:
+        return error_response(message, http_code)
+    return send_file(file_path)

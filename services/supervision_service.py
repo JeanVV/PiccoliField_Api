@@ -268,16 +268,30 @@ class SupervisionService:
         finally:
             connection.close()
 
-    def listar_incidencias(self, estado=None):
+    def listar_incidencias(self, estado=None, idPuntosVenta=None, severidad=None):
         connection = get_connection()
         try:
             repo = SupervisionRepository(connection)
-            data = repo.listar_incidencias(estado)
+            data = repo.listar_incidencias(estado=estado, idPuntosVenta=idPuntosVenta, severidad=severidad)
             if data is None:
                 return None, "Error interno al obtener incidencias", 500
             return data, "Incidencias obtenidas exitosamente", 200
         except Exception as e:
             print(f"Error listar incidencias supervision: {e}")
+            return None, "Error interno", 500
+        finally:
+            connection.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias):
+        connection = get_connection()
+        try:
+            repo = SupervisionRepository(connection)
+            data = repo.obtener_detalle_incidencia(idIncidencias)
+            if not data:
+                return None, "Incidencia no encontrada", 404
+            return data, "Detalle de incidencia obtenido exitosamente", 200
+        except Exception as e:
+            print(f"Error detalle incidencia supervision: {e}")
             return None, "Error interno", 500
         finally:
             connection.close()

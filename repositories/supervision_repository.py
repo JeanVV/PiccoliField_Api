@@ -51,10 +51,15 @@ class SupervisionRepository:
             cursor.execute("SELECT COUNT(*) AS alertas_pendientes FROM ALERTAS_STOCK WHERE estado = 'PENDIENTE'")
             alertas = cursor.fetchone()['alertas_pendientes']
             
+            # Incidencias Abiertas
+            cursor.execute("SELECT COUNT(*) AS incidencias_abiertas FROM INCIDENCIAS WHERE estado = 'ABIERTO'")
+            incidencias = cursor.fetchone()['incidencias_abiertas']
+
             return {
                 "monto_total_ventas": float(monto),
                 "cantidad_pdv_activos": pdv,
-                "cantidad_alertas": alertas
+                "cantidad_alertas": alertas,
+                "cantidad_incidencias_abiertas": incidencias
             }
         finally:
             cursor.close()
@@ -921,7 +926,7 @@ class SupervisionRepository:
             cursor.close()
 
     # ── 8. GESTIÓN DE INCIDENCIAS (SUPERVISIÓN) ────────────────────────────────
-    def listar_incidencias(self, estado=None):
+    def listar_incidencias(self, estado=None, idPuntosVenta=None, severidad=None):
         cursor = self.connection.cursor()
         try:
             sql = """
@@ -952,17 +957,67 @@ class SupervisionRepository:
                 INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
                 INNER JOIN USUARIOS u ON i.idUsuario = u.idUsuario
                 LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE 1=1
             """
             params = []
             if estado:
-                sql += " WHERE i.estado = %s"
+                sql += " AND i.estado = %s"
                 params.append(estado.strip().upper())
+            if idPuntosVenta:
+                sql += " AND i.idPuntosVenta = %s"
+                params.append(idPuntosVenta)
+            if severidad:
+                sql += " AND i.severidad = %s"
+                params.append(severidad.strip().upper())
 
             sql += " ORDER BY i.fecha_registro DESC"
             cursor.execute(sql, tuple(params))
             return cursor.fetchall()
         except Exception as e:
             print(f"Error en listar_incidencias supervision: {e}")
+            return None
+        finally:
+            cursor.close()
+
+    def obtener_detalle_incidencia(self, idIncidencias):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    i.idIncidencias,
+                    i.idIncidencias AS idIncidencia,
+                    i.tipo,
+                    i.severidad,
+                    i.descripcion,
+                    i.estado,
+                    DATE_FORMAT(i.fecha_registro, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_registro,
+                    i.comentario_atencion,
+                    DATE_FORMAT(i.fecha_atencion, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha_atencion,
+                    i.idUsuario,
+                    CONCAT(u.nombres, ' ', u.apePaterno, ' ', u.apeMaterno) AS impulsador_nombre,
+                    u.correo AS impulsador_correo,
+                    u.url_foto AS impulsador_foto,
+                    pv.idPuntosVenta,
+                    pv.puntoVenta AS local_nombre,
+                    pv.direccion AS local_direccion,
+                    e.idEvidencias,
+                    e.ruta_archivo AS ruta_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL THEN 1 ELSE 0 END AS tiene_evidencia,
+                    CASE WHEN e.idEvidencias IS NOT NULL 
+                         THEN CONCAT('/api/impulsador/incidencias/', i.idIncidencias, '/foto')
+                         ELSE NULL 
+                    END AS url_foto_evidencia
+                FROM INCIDENCIAS i
+                INNER JOIN PUNTOS_VENTA pv ON i.idPuntosVenta = pv.idPuntosVenta
+                INNER JOIN USUARIOS u ON i.idUsuario = u.idUsuario
+                LEFT JOIN EVIDENCIAS e ON e.idIncidencias = i.idIncidencias
+                WHERE i.idIncidencias = %s
+                LIMIT 1
+            """
+            cursor.execute(sql, (idIncidencias,))
+            return cursor.fetchone()
+        except Exception as e:
+            print(f"Error en obtener_detalle_incidencia supervision: {e}")
             return None
         finally:
             cursor.close()
@@ -987,15 +1042,14 @@ class SupervisionRepository:
             """, (nuevo_estado, comentario_atencion, idIncidencias))
 
             self.connection.commit()
-            return {
-                "idIncidencias": idIncidencias,
-                "idIncidencia": idIncidencias,
-                "estado": nuevo_estado,
-                "comentario_atencion": comentario_atencion
-            }, f"Incidencia marcada como {nuevo_estado} exitosamente", 200
+
+            # Devolver el detalle actualizado
+            detalle_actualizado = self.obtener_detalle_incidencia(idIncidencias)
+            return detalle_actualizado, f"Incidencia marcada como {nuevo_estado} exitosamente", 200
         except Exception as e:
             self.connection.rollback()
             print(f"Error en atender_incidencia supervision: {e}")
             raise e
         finally:
+            cursor.close()
             cursor.close()
