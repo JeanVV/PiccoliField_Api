@@ -136,6 +136,20 @@ class SupervisionService:
                 idUsuarioRegistra=idUsuarioRegistra,
                 motivo=motivo
             )
+
+            # Notificar al impulsador reasignado
+            if http_code == 200 and data:
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_reasignacion_local(
+                        idUsuario=idUsuario,
+                        idPuntosVenta=idPuntosVenta,
+                        nombre_pdv=data.get("puntoVenta"),
+                        motivo=motivo
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar reasignacion: {ex_fcm}")
+
             return data, message, http_code
         except Exception as e:
             print(f"Error reasignar impulsador: {e}")
@@ -301,6 +315,19 @@ class SupervisionService:
         try:
             repo = SupervisionRepository(connection)
             data, message, http_code = repo.atender_incidencia(idIncidencias, nuevo_estado, comentario_atencion)
+
+            # Si se atendió o resolvió exitosamente, notificar al impulsador que la reportó
+            if http_code == 200 and data:
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_incidencia_resuelta(
+                        idIncidencias=idIncidencias,
+                        nuevo_estado=nuevo_estado,
+                        comentario_atencion=comentario_atencion
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar resolucion de incidencia: {ex_fcm}")
+
             return data, message, http_code
         except Exception as e:
             print(f"Error atender incidencia: {e}")

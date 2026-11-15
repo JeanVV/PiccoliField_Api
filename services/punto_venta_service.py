@@ -47,6 +47,20 @@ class PuntoVentaService:
                 idUsuarioRegistra=idUsuarioRegistra,
                 motivo=motivo
             )
+
+            # Notificar al impulsador reasignado
+            if code == 200 and pdv_actualizado:
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_reasignacion_local(
+                        idUsuario=idUsuarioNuevo,
+                        idPuntosVenta=idPuntosVenta,
+                        nombre_pdv=pdv_actualizado.get("puntoVenta"),
+                        motivo=motivo
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar reasignacion desde PDV: {ex_fcm}")
+
             return pdv_actualizado, message, code
         except Exception as e:
             print(f"Error en asignar_responsable: {e}")

@@ -53,16 +53,56 @@ class UsuarioRepository:
         finally:
             cursor.close()
 
-    def actualizar_fcm_token(self, idUsuario, fcm_token, id_dispositivo):
+    def actualizar_fcm_token(self, idUsuario, fcm_token, id_dispositivo=None):
+        cursor = self.connection.cursor()
+        try:
+            # 1. Actualizar token principal en la tabla USUARIOS
+            sql_usuario = """
+                UPDATE USUARIOS
+                SET fcm_token = %s
+                WHERE idUsuario = %s
+            """
+            cursor.execute(sql_usuario, (fcm_token, idUsuario))
+            filas_afectadas = cursor.rowcount
+
+            # 2. Registrar o actualizar en la tabla USUARIO_DISPOSITIVO
+            sql_disp = """
+                INSERT INTO USUARIO_DISPOSITIVO (
+                    idUsuario,
+                    fcm_token,
+                    plataforma,
+                    nombre_dispositivo,
+                    activo
+                )
+                VALUES (%s, %s, 'ANDROID', %s, 1)
+                ON DUPLICATE KEY UPDATE
+                    idUsuario = VALUES(idUsuario),
+                    activo = 1,
+                    nombre_dispositivo = COALESCE(VALUES(nombre_dispositivo), nombre_dispositivo),
+                    fecha_actualizacion = CURRENT_TIMESTAMP
+            """
+            cursor.execute(sql_disp, (idUsuario, fcm_token, id_dispositivo or "Dispositivo Android"))
+            self.connection.commit()
+            return filas_afectadas
+        finally:
+            cursor.close()
+
+    def listar_notificaciones(self, idUsuario, limite=20):
         cursor = self.connection.cursor()
         try:
             sql = """
-                UPDATE USUARIOS
-                SET fcm_token = %s, id_dispositivo = %s
+                SELECT 
+                    idNotificacion,
+                    tipo,
+                    referencia,
+                    mensaje,
+                    DATE_FORMAT(fecha, '%%Y-%%m-%%d %%H:%%i:%%s') AS fecha
+                FROM NOTIFICACIONES_LOG
                 WHERE idUsuario = %s
+                ORDER BY fecha DESC, idNotificacion DESC
+                LIMIT %s
             """
-            cursor.execute(sql, (fcm_token, id_dispositivo, idUsuario))
-            self.connection.commit()
-            return cursor.rowcount
+            cursor.execute(sql, (idUsuario, limite))
+            return cursor.fetchall() or []
         finally:
             cursor.close()

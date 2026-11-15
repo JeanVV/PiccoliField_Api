@@ -426,6 +426,8 @@ class ImpulsadorRepository:
             meta_val = float(row_meta.get("meta_ventas") or 0.0)
             monto_mes = float(row_meta.get("total_vendido_mes") or subtotal)
             pct_meta = round((monto_mes / meta_val) * 100, 2) if meta_val > 0 else 0.0
+            monto_previo = monto_mes - subtotal
+            meta_alcanzada = bool(meta_val > 0 and monto_mes >= meta_val and monto_previo < meta_val)
 
             self.connection.commit()
 
@@ -445,7 +447,8 @@ class ImpulsadorRepository:
                 "avance_meta": {
                     "meta_mensual": meta_val,
                     "total_vendido_mes": monto_mes,
-                    "porcentaje_cumplimiento": pct_meta
+                    "porcentaje_cumplimiento": pct_meta,
+                    "meta_alcanzada": meta_alcanzada
                 }
             }
 

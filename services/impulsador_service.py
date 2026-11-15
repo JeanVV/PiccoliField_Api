@@ -203,6 +203,34 @@ class ImpulsadorService:
                 cantidad=cantidad
             )
 
+            # Si la venta disparó alerta de stock bajo/agotado, notificar a los promotores
+            if http_code == 201 and resultado and resultado.get("alerta_generada"):
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_alerta_stock(
+                        idPuntosVenta=idPuntosVenta,
+                        idProductos=idProductos,
+                        stock_actual=resultado.get("stock_actual", 0),
+                        stock_minimo=resultado.get("stock_minimo", 0),
+                        idAlerta=resultado.get("idAlerta")
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar alerta stock: {ex_fcm}")
+
+            # Si con esta venta el impulsador alcanzó su meta mensual, notificarle
+            avance = (resultado.get("avance_meta") or {}) if resultado else {}
+            if http_code == 201 and avance.get("meta_alcanzada"):
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_meta_alcanzada(
+                        idUsuario=idUsuario,
+                        meta_ventas=avance.get("meta_mensual", 0),
+                        total_vendido=avance.get("total_vendido_mes", 0),
+                        pct=avance.get("porcentaje_cumplimiento", 100.0)
+                    )
+                except Exception as ex_meta:
+                    print(f"[FCM] Error no bloqueante al notificar meta alcanzada: {ex_meta}")
+
             return resultado, mensaje, http_code
 
         except Exception as e:
@@ -307,6 +335,21 @@ class ImpulsadorService:
                 ruta_evidencia=ruta_relativa,
                 hash_sha=hash_sha
             )
+
+            # Si la incidencia se registró exitosamente, notificar al promotor asignado al PDV
+            if http_code == 201 and resultado:
+                try:
+                    from services.fcm_service import FCMService
+                    FCMService.notificar_nueva_incidencia(
+                        idPuntosVenta=idPuntosVenta,
+                        tipo_incidencia=tipo,
+                        severidad=severidad,
+                        descripcion=descripcion,
+                        idIncidencias=resultado.get("idIncidencias"),
+                        idUsuarioReporta=idUsuario
+                    )
+                except Exception as ex_fcm:
+                    print(f"[FCM] Error no bloqueante al notificar nueva incidencia: {ex_fcm}")
 
             return resultado, mensaje, http_code
 
