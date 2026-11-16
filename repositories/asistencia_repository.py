@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, timedelta
 
 class AsistenciaRepository:
     def __init__(self, connection):
@@ -113,23 +113,58 @@ class AsistenciaRepository:
             cursor.close()
 
     # ── 5. MARCAR ASISTENCIA (INGRESO / SALIDA) ──────────────────────────────
-    def marcar_asistencia(self, id_usuario, tipo, latitud, longitud, fecha_hora_disp):
+    def marcar_asistencia(self, id_usuario, tipo, latitud, longitud, fecha_hora_disp, observacion=None):
         cursor = self.connection.cursor()
         try:
-            # Parsear fecha y hora para calcular tardanza
             dt_disp = self._parse_datetime(fecha_hora_disp)
-            
             estado = 'A_TIEMPO'
             minutos_tardanza = 0
 
-            # Evaluación de tardanza solo para INGRESO
             if tipo.upper() == 'INGRESO':
-                hora_limite = time(9, 15, 0)  # Horario laboral 09:00 con 15 min de tolerancia
+                cursor.execute("""
+                    SELECT clave, valor
+                    FROM CONFIGURACION
+                    WHERE clave IN (
+                        'HORA_ENTRADA_OFICIAL',
+                        'TOLERANCIA_MINUTOS',
+                        'HORA_LIMITE_FALTA'
+                    )
+                """)
+                # Soporta tanto cursores de tupla como de diccionario
+                filas = cursor.fetchall()
+                configuracion = {}
+                for f in filas:
+                    if isinstance(f, dict):
+                        configuracion[f["clave"]] = f["valor"]
+                    else:
+                        configuracion[f[0]] = f[1]
+
+                hora_entrada = datetime.strptime(
+                    configuracion.get("HORA_ENTRADA_OFICIAL", "09:30:00"),
+                    "%H:%M:%S"
+                ).time()
+                tolerancia_minutos = int(
+                    configuracion.get("TOLERANCIA_MINUTOS", "10")
+                )
+                hora_limite_falta = datetime.strptime(
+                    configuracion.get("HORA_LIMITE_FALTA", "10:30:00"),
+                    "%H:%M:%S"
+                ).time()
+
                 hora_marcado = dt_disp.time()
-                if hora_marcado > hora_limite:
+                hora_inicio_dt = datetime.combine(dt_disp.date(), hora_entrada)
+                hora_tolerancia = (
+                    hora_inicio_dt + timedelta(minutes=tolerancia_minutos)
+                ).time()
+
+                if hora_marcado > hora_limite_falta:
+                    estado = 'FALTA'
+                elif hora_marcado > hora_tolerancia:
                     estado = 'TARDANZA'
-                    diff = datetime.combine(datetime.today(), hora_marcado) - datetime.combine(datetime.today(), time(9, 0, 0))
-                    minutos_tardanza = int(diff.total_seconds() // 60)
+                    hora_marcado_dt = datetime.combine(dt_disp.date(), hora_marcado)
+                    minutos_tardanza = int(
+                        (hora_marcado_dt - hora_inicio_dt).total_seconds() // 60
+                    )
 
             sql = """
                 INSERT INTO ASISTENCIAS (
@@ -139,8 +174,9 @@ class AsistenciaRepository:
                     minutos_tardanza, 
                     latitud, 
                     longitud, 
+                    observacion,
                     idUsuario
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """
             cursor.execute(sql, (
                 tipo.upper(),
@@ -149,6 +185,7 @@ class AsistenciaRepository:
                 minutos_tardanza,
                 latitud,
                 longitud,
+                observacion,
                 id_usuario
             ))
             self.connection.commit()
@@ -260,55 +297,59 @@ class AsistenciaRepository:
                 pass
         return datetime.now()
 
-    # 8. OBTENER ÚLTIMA ASISTENCIA DEL USUARIO
-    def obtener_ultima_asistencia(self, id_usuario):
-        cursor = self.db.cursor(dictionary=True)
-        query = """
-            SELECT 
-                idAsistencias AS id,
-                DATE_FORMAT(fecha_hora_servidor, '%Y-%m-%d') AS fecha,
-                DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora,
-                latitud,
-                longitud,
-                observacion AS direccion
-            FROM ASISTENCIAS
-            WHERE idUsuario = %s
-            ORDER BY idAsistencias DESC
-            LIMIT 1
-        """
-        cursor.execute(query, (id_usuario,))
-        resultado = cursor.fetchone()
-        cursor.close()
-        
-        # Convertir Decimal de MySQL a float para serializar a JSON
-        if resultado:
-            if resultado.get('latitud') is not None:
-                resultado['latitud'] = float(resultado['latitud'])
-            if resultado.get('longitud') is not None:
-                resultado['longitud'] = float(resultado['longitud'])
-        
-        return resultado
 
-    # 9. REVISAR (APROBAR/RECHAZAR) JUSTIFICACIÓN COMO ADMINISTRADOR
+    # ── 8. OBTENER ÚLTIMA ASISTENCIA DEL USUARIO ─────────────────────────────
+    def obtener_ultima_asistencia(self, id_usuario):
+        cursor = self.connection.cursor(dictionary=True)
+        try:
+            query = """
+                SELECT 
+                    idAsistencias AS id,
+                    DATE_FORMAT(fecha_hora_servidor, '%Y-%m-%d') AS fecha,
+                    DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora,
+                    latitud,
+                    longitud,
+                    observacion AS direccion
+                FROM ASISTENCIAS
+                WHERE idUsuario = %s
+                ORDER BY idAsistencias DESC
+                LIMIT 1
+            """
+            cursor.execute(query, (id_usuario,))
+            resultado = cursor.fetchone()
+            
+            # Convertir Decimal de MySQL a float para evitar error de serialización JSON
+            if resultado:
+                if resultado.get('latitud') is not None:
+                    resultado['latitud'] = float(resultado['latitud'])
+                if resultado.get('longitud') is not None:
+                    resultado['longitud'] = float(resultado['longitud'])
+            
+            return resultado
+        finally:
+            cursor.close()
+
+    # ── 9. REVISAR (APROBAR/RECHAZAR) JUSTIFICACIÓN COMO ADMINISTRADOR ───────
     def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
-        cursor = self.db.cursor()
-        
-        # Mapeo de estados ('APROBADA', 'RECHAZADA')
-        estado_enum = 'APROBADA' if estado_nuevo.upper() in ['APROBADA', 'APROBADO'] else 'RECHAZADA'
-        
-        query = """
-            UPDATE JUSTIFICACIONES
-            SET 
-                estado = %s,
-                comentario_revision = %s,
-                fecha_revision = NOW(),
-                idRevisor = %s
-            WHERE idUsuario = %s AND estado = 'PENDIENTE'
-            ORDER BY idJustificacion DESC
-            LIMIT 1
-        """
-        cursor.execute(query, (estado_enum, comentario_admin, id_revisor, id_usuario_colaborador))
-        filas_afectadas = cursor.rowcount
-        self.db.commit()
-        cursor.close()
-        return filas_afectadas > 0
+        cursor = self.connection.cursor()
+        try:
+            # Mapeo de estados ('APROBADA', 'RECHAZADA')
+            estado_enum = 'APROBADA' if estado_nuevo.upper() in ['APROBADA', 'APROBADO'] else 'RECHAZADA'
+            
+            query = """
+                UPDATE JUSTIFICACIONES
+                SET 
+                    estado = %s,
+                    comentario_revision = %s,
+                    fecha_revision = NOW(),
+                    idRevisor = %s
+                WHERE idUsuario = %s AND estado = 'PENDIENTE'
+                ORDER BY idJustificacion DESC
+                LIMIT 1
+            """
+            cursor.execute(query, (estado_enum, comentario_admin, id_revisor, id_usuario_colaborador))
+            filas_afectadas = cursor.rowcount
+            self.connection.commit()
+            return filas_afectadas > 0
+        finally:
+            cursor.close()

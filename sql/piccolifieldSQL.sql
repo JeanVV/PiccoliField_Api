@@ -30,6 +30,7 @@ CREATE TABLE PRODUCTOS (
     producto VARCHAR(150) NOT NULL,
     categoria VARCHAR(100) NOT NULL,
     precio DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    precio_mayorista DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     descripcion TEXT,
     url_foto VARCHAR(255),
     estado ENUM('ACTIVO', 'INACTIVO') NOT NULL DEFAULT 'ACTIVO'
@@ -79,7 +80,6 @@ CREATE TABLE USUARIO_DISPOSITIVO (
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
 
-
 -- 5. PUNTOS DE VENTA 
 CREATE TABLE PUNTOS_VENTA (
     idPuntosVenta INT AUTO_INCREMENT PRIMARY KEY,
@@ -92,7 +92,7 @@ CREATE TABLE PUNTOS_VENTA (
     radio_geocerca DECIMAL(6, 2) NOT NULL DEFAULT 50.00,
     tipo ENUM('VENTA', 'DISTRIBUCIÓN') NOT NULL,
     idDistrito INT NOT NULL,
-    idUsuario INT NOT NULL,
+    idUsuario INT NULL,
     FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
@@ -324,15 +324,15 @@ CREATE TABLE CONFIGURACION (
 CREATE TABLE DESEMPENIO_HISTORICO (
     idDesempenio INT AUTO_INCREMENT PRIMARY KEY,
     anio INT NOT NULL,
-    mes INT NOT NULL,
-    meta_ventas_asignada DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    mes INT NOT NULL CHECK (mes BETWEEN 1 AND 12),
+    meta_ventas_asignada INT NOT NULL,
     total_ventas_logradas DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     porcentaje_cumplimiento DECIMAL(5, 2) NOT NULL DEFAULT 0.00,
     total_asistencias INT NOT NULL DEFAULT 0,
     total_tardanzas INT NOT NULL DEFAULT 0,
     total_faltas INT NOT NULL DEFAULT 0,
-    fecha_cierre DATETIME NULL,
+    fecha_cierre DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     idUsuario INT NOT NULL,
-    UNIQUE KEY uq_usuario_desempenio (idUsuario, anio, mes),
+    UNIQUE KEY uq_desempenio_usuario_periodo (idUsuario, anio, mes),
     FOREIGN KEY (idUsuario) REFERENCES USUARIOS(idUsuario)
 );
