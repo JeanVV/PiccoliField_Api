@@ -53,23 +53,36 @@ class FCMService:
     def _obtener_ruta_credenciales(cls):
         """
         Retorna la ruta absoluta al archivo de credenciales de Firebase Admin SDK.
-        Prioriza el archivo especificado 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'.
+        Construye la ruta a partir de la ubicación de fcm_service.py.
         """
-        # 1. Ruta exacta del archivo de credenciales
-        ruta_directa = os.path.join(BASE_DIR, "firebase", cls.NOMBRE_ARCHIVO_CREDENCIAL)
+        ruta_directa = os.path.abspath(
+            os.path.join(
+                os.path.dirname(__file__),
+                "..",
+                "firebase",
+                "piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json",
+            )
+        )
+        print(f"[FCM] Buscando archivo de credenciales en: {ruta_directa}")
+
         if os.path.isfile(ruta_directa):
+            print(f"[FCM] Archivo de credenciales encontrado correctamente: {ruta_directa}")
             return ruta_directa
 
-        # 2. Variable de entorno configurada
+        print(f"[FCM] ADVERTENCIA: El archivo no existe en la ruta: {ruta_directa}")
+
+        # Fallback a variable de entorno si estuviera definida
         env_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         if env_path and os.path.isfile(env_path):
+            print(f"[FCM] Utilizando credenciales desde variable de entorno: {env_path}")
             return env_path
 
-        # 3. Cualquier archivo .json en la carpeta firebase/ que sea cuenta de servicio
-        firebase_dir = os.path.join(BASE_DIR, "firebase")
+        # Fallback a cualquier otro .json en la carpeta firebase/
+        firebase_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "firebase"))
         for f in glob.glob(os.path.join(firebase_dir, "*.json")):
             if os.path.basename(f).lower() == "google-services.json":
                 continue
+            print(f"[FCM] Utilizando archivo JSON alternativo encontrado en: {f}")
             return f
 
         return None
