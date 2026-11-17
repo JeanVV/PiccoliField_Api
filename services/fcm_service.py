@@ -26,16 +26,79 @@ try:
 except ImportError:
     service_account = None
 
+# Firebase Admin SDK (credentials.Certificate)
+try:
+    import firebase_admin
+    from firebase_admin import credentials, messaging
+except ImportError:
+    firebase_admin = None
+    credentials = None
+    messaging = None
+
 from config import BASE_DIR
 from database import get_connection
 
 SCOPES = ["https://www.googleapis.com/auth/firebase.messaging"]
 
 class FCMService:
+    _app_inicializada = False
     _credentials = None
     _access_token = None
     _token_expiry = 0
     _project_id = None
+
+    NOMBRE_ARCHIVO_CREDENCIAL = "piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json"
+
+    @classmethod
+    def _obtener_ruta_credenciales(cls):
+        """
+        Retorna la ruta absoluta al archivo de credenciales de Firebase Admin SDK.
+        Prioriza el archivo especificado 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'.
+        """
+        # 1. Ruta exacta del archivo de credenciales
+        ruta_directa = os.path.join(BASE_DIR, "firebase", cls.NOMBRE_ARCHIVO_CREDENCIAL)
+        if os.path.isfile(ruta_directa):
+            return ruta_directa
+
+        # 2. Variable de entorno configurada
+        env_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if env_path and os.path.isfile(env_path):
+            return env_path
+
+        # 3. Cualquier archivo .json en la carpeta firebase/ que sea cuenta de servicio
+        firebase_dir = os.path.join(BASE_DIR, "firebase")
+        for f in glob.glob(os.path.join(firebase_dir, "*.json")):
+            if os.path.basename(f).lower() == "google-services.json":
+                continue
+            return f
+
+        return None
+
+    @classmethod
+    def _inicializar_firebase_admin(cls):
+        """
+        Inicializa firebase_admin utilizando credentials.Certificate con el archivo JSON.
+        """
+        if firebase_admin is None or credentials is None:
+            return False, "Librería firebase-admin no instalada en el entorno"
+
+        if cls._app_inicializada or (firebase_admin._apps and len(firebase_admin._apps) > 0):
+            cls._app_inicializada = True
+            return True, "firebase_admin ya inicializado"
+
+        ruta_cred = cls._obtener_ruta_credenciales()
+        if not ruta_cred or not os.path.isfile(ruta_cred):
+            return False, f"Archivo de credenciales no encontrado en: {ruta_cred}"
+
+        try:
+            cred = credentials.Certificate(ruta_cred)
+            firebase_admin.initialize_app(cred)
+            cls._app_inicializada = True
+            print(f"[FCM] firebase_admin inicializado exitosamente con Certificate('{os.path.basename(ruta_cred)}')")
+            return True, "Inicializado con éxito"
+        except Exception as e:
+            print(f"[FCM] Error al inicializar firebase_admin.credentials.Certificate: {e}")
+            return False, str(e)
 
     @classmethod
     def _http_post_json(cls, url, headers, payload, timeout=8):
@@ -63,19 +126,17 @@ class FCMService:
 
     @classmethod
     def _obtener_credenciales_archivo(cls):
-        firebase_dir = os.path.join(BASE_DIR, "firebase")
-        json_files = glob.glob(os.path.join(firebase_dir, "*.json"))
-        if not json_files:
+        cred_path = cls._obtener_ruta_credenciales()
+        if not cred_path or not os.path.isfile(cred_path):
             return None, None
 
-        cred_path = json_files[0]
         try:
             with open(cred_path, "r", encoding="utf-8") as f:
                 key_data = json.load(f)
             project_id = key_data.get("project_id", "piccolifield")
             return cred_path, key_data
         except Exception as e:
-            print(f"[FCM] Error al leer archivo de credenciales: {e}")
+            print(f"[FCM] Error al leer archivo de credenciales {cred_path}: {e}")
             return None, None
 
     @classmethod
@@ -149,11 +210,43 @@ class FCMService:
     @classmethod
     def enviar_a_token(cls, fcm_token, titulo, mensaje, data=None):
         """
-        Envía un mensaje push directo a un token FCM usando la API HTTP v1 de Firebase.
+        Envía un mensaje push directo a un token FCM.
+        Prioriza el uso de Firebase Admin SDK con credentials.Certificate y messaging.send().
+        Si firebase-admin no está disponible o falla, utiliza la API HTTP v1 con OAuth2.
         """
         if not fcm_token:
             return False, "Token vacío"
 
+        # Todos los valores del diccionario data deben ser strings
+        data_strings = {str(k): str(v) for k, v in (data or {}).items()}
+
+        # ── 1. Intento con Firebase Admin SDK (credentials.Certificate) ──
+        if firebase_admin is not None and messaging is not None:
+            ok_init, det_init = cls._inicializar_firebase_admin()
+            if ok_init:
+                try:
+                    fcm_msg = messaging.Message(
+                        notification=messaging.Notification(
+                            title=titulo,
+                            body=mensaje,
+                        ),
+                        data=data_strings,
+                        token=fcm_token,
+                        android=messaging.AndroidConfig(
+                            priority="high",
+                            notification=messaging.AndroidNotification(
+                                sound="default",
+                                channel_id="piccoli_notificaciones",
+                                click_action="OPEN_ACTIVITY"
+                            )
+                        )
+                    )
+                    resp_id = messaging.send(fcm_msg)
+                    return True, f"Enviado con éxito (FCM Admin SDK: {resp_id})"
+                except Exception as e:
+                    print(f"[FCM Admin SDK] messaging.send falló ({e}). Intentando fallback HTTP v1...")
+
+        # ── 2. Fallback: Google FCM HTTP v1 directo ──────────────────────
         access_token, project_id = cls._obtener_access_token()
         if not access_token or not project_id:
             return False, "No se pudieron obtener credenciales de Firebase"
@@ -163,9 +256,6 @@ class FCMService:
             "Authorization": f"Bearer {access_token}",
             "Content-Type": "application/json; UTF-8"
         }
-
-        # Todos los valores del diccionario data deben ser strings
-        data_strings = {str(k): str(v) for k, v in (data or {}).items()}
 
         payload = {
             "message": {
