@@ -222,78 +222,51 @@ class FCMService:
 
     @classmethod
     def enviar_a_token(cls, fcm_token, titulo, mensaje, data=None):
-        """
-        Envía un mensaje push directo a un token FCM.
-        Prioriza el uso de Firebase Admin SDK con credentials.Certificate y messaging.send().
-        Si firebase-admin no está disponible o falla, utiliza la API HTTP v1 con OAuth2.
-        """
         if not fcm_token:
             return False, "Token vacío"
 
-        # Todos los valores del diccionario data deben ser strings
         data_strings = {str(k): str(v) for k, v in (data or {}).items()}
 
-        # ── 1. Intento con Firebase Admin SDK (credentials.Certificate) ──
+        # 1. Intento con Firebase Admin SDK si está activo
         if firebase_admin is not None and messaging is not None:
-            ok_init, det_init = cls._inicializar_firebase_admin()
-            if ok_init:
-                try:
-                    fcm_msg = messaging.Message(
-                        notification=messaging.Notification(
-                            title=titulo,
-                            body=mensaje,
-                        ),
-                        data=data_strings,
-                        token=fcm_token,
-                        android=messaging.AndroidConfig(
-                            priority="high",
-                            notification=messaging.AndroidNotification(
-                                sound="default",
-                                channel_id="piccoli_notificaciones",
-                                click_action="OPEN_ACTIVITY"
-                            )
-                        )
-                    )
-                    resp_id = messaging.send(fcm_msg)
-                    return True, f"Enviado con éxito (FCM Admin SDK: {resp_id})"
-                except Exception as e:
-                    print(f"[FCM Admin SDK] messaging.send falló ({e}). Intentando fallback HTTP v1...")
+            try:
+                cls._inicializar_firebase_admin()
+                fcm_msg = messaging.Message(
+                    notification=messaging.Notification(title=titulo, body=mensaje),
+                    data=data_strings,
+                    token=fcm_token
+                )
+                resp_id = messaging.send(fcm_msg)
+                return True, f"Enviado con éxito (SDK): {resp_id}"
+            except Exception as e:
+                print(f"[FCM Admin SDK] Falló: {e}. Probando API Directa CampusGo...")
 
-        # ── 2. Fallback: Google FCM HTTP v1 directo ──────────────────────
-        access_token, project_id = cls._obtener_access_token()
-        if not access_token or not project_id:
-            return False, "No se pudieron obtener credenciales de Firebase"
-
-        url = f"https://fcm.googleapis.com/v1/projects/{project_id}/messages:send"
+        # 2. Envío Directo con API Key de Firebase (Método CampusGo)
+        SERVER_KEY = "AIzaSyArmcYtRBGV1Zb_NmrNaxouaEeat6Aqar4"
+        url = "https://fcm.googleapis.com/fcm/send"
         headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json; UTF-8"
+            "Authorization": f"key={SERVER_KEY}",
+            "Content-Type": "application/json"
         }
-
         payload = {
-            "message": {
-                "token": fcm_token,
-                "notification": {
-                    "title": titulo,
-                    "body": mensaje
-                },
-                "data": data_strings,
-                "android": {
-                    "priority": "HIGH",
-                    "notification": {
-                        "sound": "default",
-                        "channel_id": "piccoli_notificaciones",
-                        "click_action": "OPEN_ACTIVITY"
-                    }
-                }
-            }
+            "to": fcm_token,
+            "notification": {
+                "title": titulo,
+                "body": mensaje,
+                "sound": "default"
+            },
+            "data": data_strings
         }
 
-        status_code, resp_text = cls._http_post_json(url, headers, payload, timeout=8)
-        if status_code == 200:
-            return True, "Enviado con éxito"
-        else:
-            return False, f"FCM Error {status_code}: {resp_text}"
+        try:
+            import requests
+            resp = requests.post(url, headers=headers, json=payload, timeout=8)
+            if resp.status_code == 200:
+                return True, "Enviado con éxito (API CampusGo)"
+            else:
+                return False, f"FCM Error {resp.status_code}: {resp.text}"
+        except Exception as e:
+            return False, str(e)
 
     @classmethod
     def obtener_tokens_usuario(cls, idUsuario):
