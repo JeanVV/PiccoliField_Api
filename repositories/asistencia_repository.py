@@ -300,7 +300,7 @@ class AsistenciaRepository:
 
     # ── 8. OBTENER ÚLTIMA ASISTENCIA DEL USUARIO ─────────────────────────────
     def obtener_ultima_asistencia(self, id_usuario):
-        cursor = self.connection.cursor(dictionary=True)
+        cursor = self.connection.cursor()
         try:
             query = """
                 SELECT 
@@ -351,5 +351,51 @@ class AsistenciaRepository:
             filas_afectadas = cursor.rowcount
             self.connection.commit()
             return filas_afectadas > 0
+        finally:
+            cursor.close()
+
+    # ── 10. CONSULTA RESUMEN DE ASISTENCIAS DEL DÍA (10:30 AM) ───────────────
+    def get_resumen_diario(self):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT 
+                    COUNT(u.idUsuario) AS total,
+                    COALESCE(SUM(CASE WHEN a.estado IN ('A_TIEMPO', 'TARDANZA') THEN 1 ELSE 0 END), 0) AS presentes,
+                    COALESCE(SUM(CASE WHEN a.estado = 'A_TIEMPO' THEN 1 ELSE 0 END), 0) AS aTiempo,
+                    COALESCE(SUM(CASE WHEN a.estado = 'TARDANZA' THEN 1 ELSE 0 END), 0) AS tardanzas,
+                    COALESCE(SUM(CASE WHEN a.estado = 'FALTA' OR a.idAsistencias IS NULL THEN 1 ELSE 0 END), 0) AS faltas
+                FROM USUARIOS u
+                LEFT JOIN ASISTENCIAS a ON u.idUsuario = a.idUsuario 
+                    AND DATE(a.fecha_hora_servidor) = CURDATE()
+                    AND a.tipo = 'INGRESO'
+                WHERE u.estado = 'ACTIVO' AND u.rol NOT IN ('ADMINISTRADOR', 'SUPERVISOR');
+            """
+            cursor.execute(sql)
+            return cursor.fetchone()
+        finally:
+            cursor.close()
+
+    # ── 11. TOKENS FCM DE ADMINISTRADORES Y SUPERVISORES ─────────────────────
+    def get_tokens_administradores_supervisores(self):
+        cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT DISTINCT 
+                    ud.fcm_token,
+                    ud.idUsuario,
+                    u.rol,
+                    u.nombres,
+                    u.apePaterno
+                FROM USUARIO_DISPOSITIVO ud
+                INNER JOIN USUARIOS u ON ud.idUsuario = u.idUsuario
+                WHERE u.rol IN ('ADMINISTRADOR', 'SUPERVISOR')
+                  AND ud.activo = 1
+                  AND ud.fcm_token IS NOT NULL 
+                  AND ud.fcm_token != ''
+                  AND u.estado = 'ACTIVO';
+            """
+            cursor.execute(sql)
+            return cursor.fetchall() or []
         finally:
             cursor.close()

@@ -1,10 +1,11 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 
 from services.asistencia_service import AsistenciaService
 from utils.response import error_response, success_response
 
 asistencia_bp = Blueprint("asistencias", __name__)
+asistencia_service = AsistenciaService()
 
 
 # ── 1. Resumen de Asistencias del Día ────────────────────────────────────────
@@ -229,3 +230,20 @@ def revisar_justificacion():
             ),
             500,
         )
+
+
+# ── 8. Notificación Push de Resumen Diario de Asistencias (10:30 AM / Manual) ────
+@asistencia_bp.route("/api/asistencias/notificar-resumen", methods=["GET", "POST"])
+def notificar_resumen():
+    """
+    Dispara manualmente el envío de la Notificación Push del Resumen Diario de Asistencias
+    a todos los Administradores y Supervisores registrados en USUARIO_DISPOSITIVO.
+    Habilitado para pruebas manuales en Postman (GET o POST).
+    """
+    data, message, http_code = asistencia_service.enviar_notificacion_resumen_diario()
+
+    if data is None:
+        return error_response(message, http_code)
+
+    return success_response(data, message, http_code)
+

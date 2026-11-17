@@ -134,6 +134,25 @@
       "name": "2. Módulo de Asistencias",
       "item": [
         {
+          "name": "Enviar Notificación Push Resumen Diario (10:30 AM / Manual)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{url}}/asistencias/notificar-resumen",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "asistencias",
+                "notificar-resumen"
+              ]
+            },
+            "description": "Dispara manualmente el resumen diario de asistencias a Administradores y Supervisores vía Push FCM."
+          },
+          "response": []
+        },
+        {
           "name": "Resumen General de Asistencias",
           "request": {
             "auth": {

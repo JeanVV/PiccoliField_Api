@@ -11,6 +11,7 @@ from routes.impulsador_routes import impulsador_bp
 from routes.dispositivo_routes import dispositivo_bp
 from routes.pedido_routes import pedido_bp
 from routes.producto_routes import producto_bp
+from utils.scheduler import iniciar_scheduler
 
 
 def create_app():
@@ -45,6 +46,8 @@ def create_app():
         from flask import send_from_directory
         from config import BASE_DIR
         return send_from_directory(os.path.join(BASE_DIR, "uploads"), filename)
+
+    iniciar_scheduler(app)
 
     return app
 

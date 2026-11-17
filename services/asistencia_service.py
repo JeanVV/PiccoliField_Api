@@ -1,6 +1,7 @@
 from datetime import datetime
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository
+from services.fcm_service import FCMService
 
 
 class AsistenciaService:
@@ -138,17 +139,154 @@ class AsistenciaService:
             connection.close()
 
     def obtener_ultima_asistencia(self, id_usuario):
-        return self.repository.obtener_ultima_asistencia(id_usuario)
+        connection = get_connection()
+        try:
+            repository = AsistenciaRepository(connection)
+            return repository.obtener_ultima_asistencia(id_usuario)
+        finally:
+            connection.close()
 
     def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
         if not id_usuario_colaborador:
             raise ValueError("El idUsuario del colaborador es obligatorio.")
         if not estado_nuevo:
             raise ValueError("El estadoNuevo ('APROBADA'/'RECHAZADA') es obligatorio.")
-            
-        return self.repository.revisar_justificacion(
-            id_usuario_colaborador, 
-            estado_nuevo, 
-            comentario_admin, 
-            id_revisor
-        )
+
+        connection = get_connection()
+        try:
+            repository = AsistenciaRepository(connection)
+            return repository.revisar_justificacion(
+                id_usuario_colaborador, 
+                estado_nuevo, 
+                comentario_admin, 
+                id_revisor
+            )
+        finally:
+            connection.close()
+
+    # ── ENVÍO DE NOTIFICACIÓN PUSH DE RESUMEN DIARIO (10:30 AM) ─────────────
+    def enviar_notificacion_resumen_diario(self):
+        """
+        Consulta las métricas de asistencia del día, obtiene los tokens FCM
+        de Administradores y Supervisores, y envía la notificación push correspondiente.
+        """
+        connection = get_connection()
+        try:
+            repository = AsistenciaRepository(connection)
+
+            # 1. Consultar métricas del día con la SQL especificada
+            row = repository.get_resumen_diario()
+            total = int(row.get("total") or 0) if row else 0
+            presentes = int(row.get("presentes") or 0) if row else 0
+            aTiempo = int(row.get("aTiempo") or 0) if row else 0
+            tardanzas = int(row.get("tardanzas") or 0) if row else 0
+            faltas = int(row.get("faltas") or 0) if row else 0
+
+            # 2. Obtener tokens FCM de USUARIO_DISPOSITIVO para Administradores y Supervisores
+            dispositivos = repository.get_tokens_administradores_supervisores()
+
+            # 3. Construir mensaje Push FCM y Data Payload
+            titulo = "Resumen de Asistencias del Día"
+            body = f"Hoy: {presentes}/{total} presentes ({aTiempo} a tiempo, {tardanzas} tardanzas, {faltas} faltas)."
+            data_payload = {
+                "tipo": "RESUMEN_ASISTENCIA",
+                "title": titulo,
+                "body": body,
+                "total": str(total),
+                "presentes": str(presentes),
+                "aTiempo": str(aTiempo),
+                "tardanzas": str(tardanzas),
+                "faltas": str(faltas),
+            }
+
+            if not dispositivos:
+                print("[RESUMEN_DIARIO] No se encontraron dispositivos activos para Administradores o Supervisores.")
+                return {
+                    "metricas": {
+                        "total": total,
+                        "presentes": presentes,
+                        "aTiempo": aTiempo,
+                        "tardanzas": tardanzas,
+                        "faltas": faltas,
+                    },
+                    "tokens_encontrados": 0,
+                    "notificaciones_enviadas": 0,
+                    "fallidas": 0,
+                    "mensaje": body,
+                }, "No se encontraron tokens activos para Administradores o Supervisores", 200
+
+            # 4. Enviar notificación FCM a cada token único
+            tokens_procesados = set()
+            enviados = 0
+            fallidos = 0
+            detalles_envio = []
+
+            for d in dispositivos:
+                token = d.get("fcm_token")
+                id_usuario = d.get("idUsuario")
+                if not token or token in tokens_procesados:
+                    continue
+                tokens_procesados.add(token)
+
+                ok, det = FCMService.enviar_a_token(
+                    fcm_token=token,
+                    titulo=titulo,
+                    mensaje=body,
+                    data=data_payload,
+                )
+
+                if ok:
+                    enviados += 1
+                else:
+                    fallidos += 1
+
+                detalles_envio.append({
+                    "idUsuario": id_usuario,
+                    "rol": d.get("rol"),
+                    "token": f"{token[:12]}...",
+                    "status": "ENVIADO" if ok else "FALLIDO",
+                    "detalle": det,
+                })
+
+                # Registrar en NOTIFICACIONES_LOG
+                FCMService._guardar_log(
+                    idUsuario=id_usuario,
+                    tipo="RESUMEN_ASISTENCIA",
+                    referencia="RESUMEN-DIARIO",
+                    mensaje=body,
+                    resultado=det,
+                )
+
+            resultado = {
+                "metricas": {
+                    "total": total,
+                    "presentes": presentes,
+                    "aTiempo": aTiempo,
+                    "tardanzas": tardanzas,
+                    "faltas": faltas,
+                },
+                "tokens_encontrados": len(tokens_procesados),
+                "notificaciones_enviadas": enviados,
+                "fallidas": fallidos,
+                "mensaje_enviado": {
+                    "title": titulo,
+                    "body": body,
+                    "data": data_payload,
+                },
+                "detalles": detalles_envio,
+            }
+
+            return resultado, "Notificación de resumen diario enviada correctamente", 200
+        except Exception as e:
+            print(f"[RESUMEN_DIARIO] Error al enviar notificación de resumen diario: {e}")
+            return None, f"Error al enviar notificación de resumen diario: {str(e)}", 500
+        finally:
+            connection.close()
+
+
+def enviar_notificacion_resumen_diario():
+    """
+    Función helper a nivel de módulo para invocación directa desde el scheduler o cron.
+    """
+    service = AsistenciaService()
+    return service.enviar_notificacion_resumen_diario()
