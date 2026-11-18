@@ -78,16 +78,28 @@ def marcar_asistencia():
 
 # ── 6. Enviar Justificación de Inasistencia / Tardanza ───────────────────────
 @asistencia_bp.route("/api/asistencias/justificar", methods=["POST"])
-@jwt_required()
+@asistencia_bp.route("/justificar", methods=["POST"])
+@jwt_required(optional=True)
 def registrar_justificacion():
-    payload = request.get_json() or {}
-    service = AsistenciaService()
-    data, message, http_code = service.registrar_justificacion(payload)
+    data = request.get_json() or {}
+    id_usuario = data.get("idUsuario")
+    motivo = data.get("motivo")
+    descripcion = data.get("descripcion") or data.get("detalle")
+    fecha = data.get("fecha")
+    ruta_sustento = data.get("ruta_sustento") or data.get("fotoSustento")
 
-    if data is None:
+    resultado, message, http_code = asistencia_service.registrar_justificacion(
+        payload_or_id_usuario=id_usuario,
+        motivo=motivo,
+        descripcion=descripcion,
+        fecha=fecha,
+        ruta_sustento=ruta_sustento
+    )
+
+    if resultado is None:
         return error_response(message, http_code)
 
-    return success_response(data, message, http_code)
+    return success_response(resultado, message, http_code)
 
 
 # ── 7. Obtener Última Justificación de un Usuario ────────────────────────────
@@ -163,24 +175,24 @@ def obtener_ultima_asistencia():
 
 # ── 7. Revisar justificación de un Usuario ────────────────────────────
 @asistencia_bp.route("/api/asistencias/justificacion/revisar", methods=["POST"])
+@asistencia_bp.route("/justificacion/revisar", methods=["POST"])
 def revisar_justificacion():
     try:
         data = request.get_json() or {}
 
-        # Parámetros que envía Android Studio (RevisionJustificacionRequest)
+        # Parámetros (compatibles con Postman y Android Studio)
         id_usuario = data.get("idUsuario")
-        estado_nuevo = data.get("estadoNuevo")  # "APROBADA" o "RECHAZADA"
-        comentario_admin = data.get("comentarioAdmin", "")
-
-        # ID del Administrador que está revisando (obtenido del token o body)
+        id_asistencias = data.get("idAsistencias") or data.get("id_asistencias")
         id_revisor = data.get("idRevisor", 1)
+        estado = data.get("estado") or data.get("estadoNuevo")  # "APROBADA" o "RECHAZADA"
+        comentario = data.get("comentarioRevision") or data.get("comentarioAdmin") or ""
 
-        if not id_usuario or not estado_nuevo:
+        if (not id_usuario and not id_asistencias) or not estado:
             return (
                 jsonify(
                     {
                         "status": False,
-                        "message": "Faltan datos obligatorios (idUsuario, estadoNuevo)",
+                        "message": "Faltan datos obligatorios (idUsuario o idAsistencias, estado)",
                         "data": None,
                     }
                 ),
@@ -188,10 +200,11 @@ def revisar_justificacion():
             )
 
         exito = asistencia_service.revisar_justificacion(
-            id_usuario_colaborador=id_usuario,
-            estado_nuevo=estado_nuevo,
-            comentario_admin=comentario_admin,
+            id_usuario=id_usuario,
             id_revisor=id_revisor,
+            estado=estado,
+            comentario=comentario,
+            id_asistencias=id_asistencias,
         )
 
         if exito:
@@ -199,7 +212,7 @@ def revisar_justificacion():
                 jsonify(
                     {
                         "status": True,
-                        "message": f"Justificación {estado_nuevo.lower()} exitosamente",
+                        "message": "Revisión registrada correctamente",
                         "data": None,
                     }
                 ),
@@ -210,11 +223,11 @@ def revisar_justificacion():
                 jsonify(
                     {
                         "status": False,
-                        "message": "No se encontró una justificación pendiente para este usuario",
+                        "message": "No se encontró la justificación a revisar",
                         "data": None,
                     }
                 ),
-                404,
+                400,
             )
 
     except ValueError as ve:

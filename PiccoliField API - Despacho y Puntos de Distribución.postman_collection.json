@@ -134,6 +134,35 @@
       "name": "2. Módulo de Asistencias",
       "item": [
         {
+          "name": "Revisar Justificación (Aprobar / Rechazar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"idUsuario\": 2,\n    \"idRevisor\": 1,\n    \"estado\": \"APROBADA\",\n    \"comentarioRevision\": \"Sustento médico verificado y aprobado.\"\n}"
+            },
+            "url": {
+              "raw": "{{url}}/asistencias/justificacion/revisar",
+              "host": [
+                "{{url}}"
+              ],
+              "path": [
+                "asistencias",
+                "justificacion",
+                "revisar"
+              ]
+            },
+            "description": "Permite al Administrador aprobar o rechazar una justificación de inasistencia/tardanza."
+          },
+          "response": []
+        },
+        {
           "name": "Enviar Notificación Push Resumen Diario (10:30 AM / Manual)",
           "request": {
             "method": "GET",
