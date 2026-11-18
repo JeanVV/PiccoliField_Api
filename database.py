@@ -3,7 +3,7 @@ import MySQLdb.cursors
 from config import Config
 
 def get_connection():
-    return dbc.connect(
+    connection = dbc.connect(
         host=Config.MYSQL_HOST,
         port=Config.MYSQL_PORT,
         user=Config.MYSQL_USER,
@@ -13,3 +13,7 @@ def get_connection():
         cursorclass=MySQLdb.cursors.DictCursor,
         autocommit=False
     )
+    cursor = connection.cursor()
+    cursor.execute("SET time_zone = '-05:00';")
+    cursor.close()
+    return connection

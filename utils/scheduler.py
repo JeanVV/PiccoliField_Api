@@ -1,7 +1,16 @@
 import os
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
+
+try:
+    import pytz
+    peru_tz = pytz.timezone("America/Lima")
+except ImportError:
+    peru_tz = timezone(timedelta(hours=-5))
+
+def get_now_peru():
+    return datetime.now(peru_tz)
 
 _scheduler_instancia = None
 _scheduler_lock = threading.Lock()
@@ -9,10 +18,10 @@ _scheduler_lock = threading.Lock()
 
 def ejecutar_job_resumen_diario():
     """
-    Ejecuta el envío de la notificación de resumen diario de asistencias a las 10:30 AM.
+    Ejecuta el envío de la notificación de resumen diario de asistencias a las 10:30 AM (Hora Perú).
     """
-    ahora_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[SCHEDULER {ahora_str}] Iniciando ejecución programada de Resumen Diario de Asistencias (10:30 AM)...")
+    ahora_str = get_now_peru().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[SCHEDULER {ahora_str}] Iniciando ejecución programada de Resumen Diario de Asistencias (10:30 AM Perú)...")
     try:
         from services.asistencia_service import enviar_notificacion_resumen_diario
         resultado, mensaje, codigo = enviar_notificacion_resumen_diario()
@@ -25,14 +34,14 @@ def ejecutar_job_resumen_diario():
 
 def _fallback_loop():
     """
-    Hilo de respaldo que duerme hasta las 10:30:00 AM cada día
+    Hilo de respaldo que duerme hasta las 10:30:00 AM cada día (Hora Perú)
     cuando APScheduler no está instalado o no se encuentra disponible.
     """
-    print("[SCHEDULER Fallback] Hilo en segundo plano activado para disparar a las 10:30 AM.")
+    print("[SCHEDULER Fallback] Hilo en segundo plano activado para disparar a las 10:30 AM (Hora Perú).")
     while True:
         try:
-            ahora = datetime.now()
-            # Hora objetivo de hoy a las 10:30:00
+            ahora = get_now_peru()
+            # Hora objetivo de hoy a las 10:30:00 hora Perú
             objetivo = ahora.replace(hour=10, minute=30, second=0, microsecond=0)
             if ahora >= objetivo:
                 # Ya pasaron las 10:30 de hoy, programar para mañana a las 10:30
@@ -54,7 +63,7 @@ def _fallback_loop():
 def iniciar_scheduler(app=None):
     """
     Inicializa el planificador de tareas programadas (APScheduler o fallback con Thread).
-    Configura la ejecución diaria a las 10:30:00 AM.
+    Configura la ejecución diaria a las 10:30:00 AM en zona horaria America/Lima.
     """
     global _scheduler_instancia
 
@@ -71,10 +80,10 @@ def iniciar_scheduler(app=None):
             from apscheduler.schedulers.background import BackgroundScheduler
             from apscheduler.triggers.cron import CronTrigger
 
-            scheduler = BackgroundScheduler(daemon=True)
+            scheduler = BackgroundScheduler(daemon=True, timezone=peru_tz)
             scheduler.add_job(
                 func=ejecutar_job_resumen_diario,
-                trigger=CronTrigger(hour=10, minute=30, second=0),
+                trigger=CronTrigger(hour=10, minute=30, second=0, timezone="America/Lima"),
                 id="resumen_diario_asistencias_1030",
                 name="Resumen Diario de Asistencias (10:30 AM)",
                 replace_existing=True,
@@ -82,7 +91,7 @@ def iniciar_scheduler(app=None):
             )
             scheduler.start()
             _scheduler_instancia = scheduler
-            print("[SCHEDULER] APScheduler iniciado exitosamente. Tarea programada a las 10:30:00 AM todos los días.")
+            print("[SCHEDULER] APScheduler iniciado exitosamente para las 10:30:00 AM (America/Lima) todos los días.")
             return scheduler
         except ImportError:
             print("[SCHEDULER] APScheduler no encontrado en el entorno. Utilizando planificador nativo en segundo plano.")

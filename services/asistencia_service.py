@@ -1,7 +1,7 @@
 import threading
 from datetime import datetime
 from database import get_connection
-from repositories.asistencia_repository import AsistenciaRepository
+from repositories.asistencia_repository import AsistenciaRepository, get_now_peru
 from services.fcm_service import FCMService
 
 
@@ -76,35 +76,42 @@ class AsistenciaService:
             connection.close()
 
     # ── POST /api/asistencias/marcar ─────────────────────────────────────────
-    def registrar_asistencia(self, payload):
+    def marcar_asistencia(self, payload_or_id_usuario, tipo=None, latitud=None, longitud=None, direccion=None, sede=None, fecha_hora_disp=None, **kwargs):
+        if isinstance(payload_or_id_usuario, dict):
+            payload = payload_or_id_usuario
+            id_usuario = payload.get("idUsuario")
+            tipo = payload.get("tipo")
+            latitud = payload.get("latitud")
+            longitud = payload.get("longitud")
+            direccion = payload.get("direccion")
+            sede = payload.get("sede")
+            fecha_hora_disp = payload.get("fechaHoraDispositivo")
+        else:
+            id_usuario = payload_or_id_usuario
+
+        if not id_usuario or not tipo:
+            return None, "idUsuario y tipo son requeridos", 400
+
         connection = get_connection()
         try:
-            id_usuario = payload.get("idUsuario")
-            tipo = payload.get("tipo", "INGRESO")
-            latitud = payload.get("latitud", 0.0)
-            longitud = payload.get("longitud", 0.0)
-            fecha_hora_disp = payload.get("fechaHoraDispositivo") or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-            if not id_usuario:
-                return None, "El idUsuario es requerido", 400
-
             repository = AsistenciaRepository(connection)
             resultado = repository.marcar_asistencia(
                 id_usuario=id_usuario,
                 tipo=tipo,
                 latitud=latitud,
                 longitud=longitud,
+                direccion=direccion,
+                sede=sede,
                 fecha_hora_disp=fecha_hora_disp
             )
-
-            mensaje_resp = resultado.get("message", "Asistencia registrada correctamente")
-            codigo_http = 200 if resultado.get("yaRegistrado") else 201
-
-            return resultado, mensaje_resp, codigo_http
+            msg = resultado.get("mensaje") or resultado.get("message") or "Asistencia registrada correctamente"
+            return resultado, msg, 201
         except Exception as e:
             return None, f"Error al marcar asistencia: {str(e)}", 500
         finally:
             connection.close()
+
+    registrar_asistencia = marcar_asistencia
 
     # ── POST /api/asistencias/justificar ──────────────────────────────────────
     def registrar_justificacion(self, payload_or_id_usuario, motivo=None, descripcion=None, fecha=None, ruta_sustento=None):
@@ -113,11 +120,11 @@ class AsistenciaService:
             id_usuario = payload.get("idUsuario")
             motivo = payload.get("motivo")
             descripcion = payload.get("descripcion") or payload.get("detalle")
-            fecha = payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")
+            fecha = payload.get("fecha") or get_now_peru().strftime("%Y-%m-%d")
             ruta_sustento = payload.get("ruta_sustento") or payload.get("fotoSustento")
         else:
             id_usuario = payload_or_id_usuario
-            fecha = fecha or datetime.now().strftime("%Y-%m-%d")
+            fecha = fecha or get_now_peru().strftime("%Y-%m-%d")
 
         if not id_usuario or not motivo or not descripcion:
             return None, "idUsuario, motivo y descripción son requeridos", 400
