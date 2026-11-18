@@ -217,6 +217,14 @@ class AsistenciaRepository:
                 id_asistencia = cursor.lastrowid
 
             # 2. INSERT ultra simple a la tabla JUSTIFICACIONES (100% fiel a piccoliFieldSql.txt)
+            ruta_final = ruta_sustento
+            if ruta_final and len(str(ruta_final)) > 255:
+                try:
+                    from services.asistencia_service import guardar_foto_sustento
+                    ruta_final = guardar_foto_sustento(ruta_final, id_user) or ""
+                except Exception:
+                    ruta_final = str(ruta_final)[:255]
+
             sql_justificacion = """
                 INSERT INTO JUSTIFICACIONES (
                     idAsistencias, idUsuario, motivo, descripcion, estado, ruta_sustento, fecha_registro
@@ -230,7 +238,7 @@ class AsistenciaRepository:
                     estado = 'PENDIENTE',
                     fecha_registro = NOW()
             """
-            cursor.execute(sql_justificacion, (id_asistencia, id_user, str(motivo), str(descripcion), ruta_sustento))
+            cursor.execute(sql_justificacion, (id_asistencia, id_user, str(motivo), str(descripcion), ruta_final))
             self.connection.commit()
 
             id_justificacion = cursor.lastrowid

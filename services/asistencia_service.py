@@ -1,8 +1,46 @@
+import os
+import base64
 import threading
 from datetime import datetime
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository, get_now_peru
 from services.fcm_service import FCMService
+
+
+def guardar_foto_sustento(base64_str, id_usuario):
+    if not base64_str or len(str(base64_str)) < 100:
+        return base64_str  # Si ya es una URL o ruta corta, la devuelve tal cual
+
+    try:
+        raw_b64 = str(base64_str)
+        # Limpiar prefijo data:image si existiera
+        if "," in raw_b64:
+            raw_b64 = raw_b64.split(",")[1]
+
+        image_data = base64.b64decode(raw_b64)
+        folder = os.path.join("uploads", "justificaciones")
+        os.makedirs(folder, exist_ok=True)
+
+        filename = f"sustento_{id_usuario}_{int(datetime.now().timestamp())}.jpg"
+        filepath = os.path.join(folder, filename)
+
+        with open(filepath, "wb") as f:
+            f.write(image_data)
+
+        # Copia de compatibilidad en static/uploads/justificaciones
+        try:
+            static_folder = os.path.join("static", "uploads", "justificaciones")
+            os.makedirs(static_folder, exist_ok=True)
+            with open(os.path.join(static_folder, filename), "wb") as sf:
+                sf.write(image_data)
+        except Exception:
+            pass
+
+        # Retorna la ruta relativa corta para guardar en varchar(255)
+        return f"uploads/justificaciones/{filename}"
+    except Exception as e:
+        print(f"[ERROR AL GUARDAR FOTO SUSTENTO]: {str(e)}")
+        return None
 
 
 class AsistenciaService:
@@ -129,6 +167,10 @@ class AsistenciaService:
 
         if not id_usuario or not motivo or not descripcion:
             return None, "idUsuario, motivo y descripción son requeridos", 400
+
+        # Guardar imagen en base64 en archivo y guardar sólo la ruta corta
+        if ruta_sustento:
+            ruta_sustento = guardar_foto_sustento(ruta_sustento, id_usuario)
 
         connection = get_connection()
         try:
