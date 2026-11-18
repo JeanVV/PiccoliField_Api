@@ -190,35 +190,39 @@ class AsistenciaRepository:
         except TypeError:
             cursor = self.connection.cursor()
         try:
-            # 1. Verificar si ya existe una asistencia para esa fecha
+            id_user = int(id_usuario) if id_usuario else 1
+            fecha_str = str(fecha).split(" ")[0] if fecha else get_now_peru().strftime("%Y-%m-%d")
+
+            # 1. Asegurar que exista un idAsistencias para la fecha indicada
             sql_check = """
                 SELECT idAsistencias FROM ASISTENCIAS 
                 WHERE idUsuario = %s AND (DATE(fecha_hora_servidor) = %s OR DATE(fecha_hora_dispositivo) = %s)
                 ORDER BY idAsistencias DESC LIMIT 1
             """
-            cursor.execute(sql_check, (id_usuario, fecha, fecha))
+            cursor.execute(sql_check, (id_user, fecha_str, fecha_str))
             asistencia = cursor.fetchone()
 
             if asistencia:
                 id_asistencia = asistencia['idAsistencias'] if isinstance(asistencia, dict) else asistencia[0]
             else:
-                # Si no existe asistencia previa, se crea el registro de FALTA
+                fecha_disp = f"{fecha_str} 09:00:00"
                 sql_insert_asistencia = """
                     INSERT INTO ASISTENCIAS (
                         idUsuario, tipo, estado, fecha_hora_servidor, fecha_hora_dispositivo, observacion
                     ) VALUES (
-                        %s, 'INGRESO', 'FALTA', NOW(), CONCAT(%s, ' 09:00:00'), 'Inasistencia con justificación'
+                        %s, 'INGRESO', 'FALTA', NOW(), %s, 'Inasistencia con justificación'
                     )
                 """
-                cursor.execute(sql_insert_asistencia, (id_usuario, fecha))
+                cursor.execute(sql_insert_asistencia, (id_user, fecha_disp))
                 id_asistencia = cursor.lastrowid
 
-            # 2. Insertar o actualizar fila en la tabla JUSTIFICACIONES (idAsistencias es UNIQUE)
+            # 2. INSERT ultra simple a la tabla JUSTIFICACIONES (100% fiel a piccoliFieldSql.txt)
             sql_justificacion = """
                 INSERT INTO JUSTIFICACIONES (
                     idAsistencias, idUsuario, motivo, descripcion, estado, ruta_sustento, fecha_registro
+                ) VALUES (
+                    %s, %s, %s, %s, 'PENDIENTE', %s, NOW()
                 )
-                VALUES (%s, %s, %s, %s, 'PENDIENTE', %s, NOW())
                 ON DUPLICATE KEY UPDATE
                     motivo = VALUES(motivo),
                     descripcion = VALUES(descripcion),
@@ -226,27 +230,26 @@ class AsistenciaRepository:
                     estado = 'PENDIENTE',
                     fecha_registro = NOW()
             """
-            cursor.execute(sql_justificacion, (id_asistencia, id_usuario, motivo, descripcion, ruta_sustento))
+            cursor.execute(sql_justificacion, (id_asistencia, id_user, str(motivo), str(descripcion), ruta_sustento))
             self.connection.commit()
 
             id_justificacion = cursor.lastrowid
             if not id_justificacion:
-                cursor.execute(
-                    "SELECT idJustificacion FROM JUSTIFICACIONES WHERE idAsistencias = %s LIMIT 1",
-                    (id_asistencia,)
-                )
+                cursor.execute("SELECT idJustificacion FROM JUSTIFICACIONES WHERE idAsistencias = %s LIMIT 1", (id_asistencia,))
                 row_j = cursor.fetchone()
                 id_justificacion = row_j["idJustificacion"] if isinstance(row_j, dict) else row_j[0]
 
             return {
                 "idJustificacion": id_justificacion,
                 "idAsistencias": id_asistencia,
-                "idUsuario": id_usuario,
-                "estado": "PENDIENTE"
+                "idUsuario": id_user,
+                "estado": "PENDIENTE",
+                "mensaje": "Justificación registrada exitosamente",
+                "message": "Justificación registrada exitosamente"
             }
         except Exception as e:
             self.connection.rollback()
-            print(f"[ERROR registrar_justificacion]: {str(e)}")
+            print(f"[ERROR registrar_justificacion]: {type(e).__name__} - {str(e)}")
             raise e
         finally:
             cursor.close()

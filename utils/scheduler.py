@@ -3,6 +3,10 @@ import time
 import threading
 from datetime import datetime, timedelta, timezone
 
+from config import Config
+from database import get_connection
+from repositories.asistencia_repository import AsistenciaRepository
+
 try:
     import pytz
     peru_tz = pytz.timezone("America/Lima")
@@ -16,20 +20,27 @@ _scheduler_instancia = None
 _scheduler_lock = threading.Lock()
 
 
-def ejecutar_job_resumen_diario():
-    """
-    Ejecuta el envío de la notificación de resumen diario de asistencias a las 10:30 AM (Hora Perú).
-    """
-    ahora_str = get_now_peru().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[SCHEDULER {ahora_str}] Iniciando ejecución programada de Resumen Diario de Asistencias (10:30 AM Perú)...")
+def ejecutar_resumen_diario_job():
+    connection = None
     try:
+        connection = get_connection()
+        repository = AsistenciaRepository(connection)
+        resumen = repository.get_resumen_diario()
+        
+        # Enviar notificación FCM
         from services.asistencia_service import enviar_notificacion_resumen_diario
         resultado, mensaje, codigo = enviar_notificacion_resumen_diario()
-        print(f"[SCHEDULER {ahora_str}] Resumen Diario completado con código {codigo}: {mensaje}")
+        print(f"[SCHEDULER SUCCESS]: Resumen diario ejecutado correctamente.")
         return resultado
     except Exception as e:
-        print(f"[SCHEDULER {ahora_str}] Error ejecutando Resumen Diario: {e}")
+        print(f"[SCHEDULER ERROR]: {str(e)}")
         return None
+    finally:
+        if connection:
+            connection.close()
+
+
+ejecutar_job_resumen_diario = ejecutar_resumen_diario_job
 
 
 def _fallback_loop():
@@ -51,7 +62,7 @@ def _fallback_loop():
             print(f"[SCHEDULER Fallback] Próxima ejecución a las: {objetivo.strftime('%Y-%m-%d %H:%M:%S')} (esperando {segundos_espera:.1f} segundos)")
 
             time.sleep(segundos_espera)
-            ejecutar_job_resumen_diario()
+            ejecutar_resumen_diario_job()
 
             # Dormir 2 segundos adicionales para no reingresar en el mismo segundo
             time.sleep(2)
@@ -82,7 +93,7 @@ def iniciar_scheduler(app=None):
 
             scheduler = BackgroundScheduler(daemon=True, timezone=peru_tz)
             scheduler.add_job(
-                func=ejecutar_job_resumen_diario,
+                func=ejecutar_resumen_diario_job,
                 trigger=CronTrigger(hour=10, minute=30, second=0, timezone="America/Lima"),
                 id="resumen_diario_asistencias_1030",
                 name="Resumen Diario de Asistencias (10:30 AM)",
@@ -104,4 +115,3 @@ def iniciar_scheduler(app=None):
         _scheduler_instancia = t
         print("[SCHEDULER] Planificador nativo iniciado a las 10:30:00 AM todos los días.")
         return _scheduler_instancia
-
