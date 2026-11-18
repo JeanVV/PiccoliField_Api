@@ -6,22 +6,31 @@ class AsistenciaRepository:
 
     # ── 1. RESUMEN DEL DÍA ───────────────────────────────────────────────────
     def get_resumen(self):
-        cursor = self.connection.cursor()
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
         try:
             sql = """
                 SELECT 
                     COUNT(u.idUsuario) AS total,
                     COALESCE(SUM(CASE WHEN a.estado IN ('A_TIEMPO', 'TARDANZA') THEN 1 ELSE 0 END), 0) AS presentes,
                     COALESCE(SUM(CASE WHEN a.estado = 'A_TIEMPO' THEN 1 ELSE 0 END), 0) AS aTiempo,
-                    COALESCE(SUM(CASE WHEN a.estado = 'TARDANZA' THEN 1 ELSE 0 END), 0) AS tardanzas
+                    COALESCE(SUM(CASE WHEN a.estado = 'TARDANZA' THEN 1 ELSE 0 END), 0) AS tardanzas,
+                    COALESCE(SUM(CASE WHEN a.estado = 'FALTA' THEN 1 ELSE 0 END), 0) AS faltas,
+                    COALESCE(SUM(CASE WHEN a.idAsistencias IS NULL THEN 1 ELSE 0 END), 0) AS sinMarcar
                 FROM USUARIOS u
                 LEFT JOIN ASISTENCIAS a ON u.idUsuario = a.idUsuario 
                     AND DATE(a.fecha_hora_servidor) = CURDATE()
                     AND a.tipo = 'INGRESO'
-                WHERE u.estado = 'ACTIVO' AND u.rol != 'ADMINISTRADOR'
+                WHERE u.estado = 'ACTIVO' AND u.rol NOT IN ('ADMINISTRADOR', 'SUPERVISOR')
             """
             cursor.execute(sql)
-            return cursor.fetchone()
+            resumen = cursor.fetchone() or {}
+            total = resumen.get('total', 0)
+            presentes = resumen.get('presentes', 0)
+            resumen['porcentaje'] = int((presentes / total * 100)) if total > 0 else 0
+            return resumen
         finally:
             cursor.close()
 
@@ -121,6 +130,28 @@ class AsistenciaRepository:
             minutos_tardanza = 0
 
             if tipo.upper() == 'INGRESO':
+                # Verificar si ya existe una marca de INGRESO hoy para este idUsuario
+                cursor.execute("""
+                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_dispositivo, '%H:%i:%s') AS hora, estado
+                    FROM ASISTENCIAS
+                    WHERE idUsuario = %s AND tipo = 'INGRESO' AND DATE(fecha_hora_servidor) = CURDATE()
+                    LIMIT 1
+                """, (id_usuario,))
+                ingreso_existente = cursor.fetchone()
+
+                if ingreso_existente:
+                    hora_existente = ingreso_existente.get("hora", "") if isinstance(ingreso_existente, dict) else ingreso_existente[1]
+                    estado_existente = ingreso_existente.get("estado", "A_TIEMPO") if isinstance(ingreso_existente, dict) else ingreso_existente[2]
+                    id_existente = ingreso_existente.get("idAsistencias") if isinstance(ingreso_existente, dict) else ingreso_existente[0]
+                    return {
+                        "idAsistencias": id_existente,
+                        "tipo": "INGRESO",
+                        "estado": estado_existente,
+                        "minutosTardanza": 0,
+                        "yaRegistrado": True,
+                        "message": f"Ya has registrado tu ingreso hoy a las {hora_existente}"
+                    }
+
                 cursor.execute("""
                     SELECT clave, valor
                     FROM CONFIGURACION
@@ -204,56 +235,66 @@ class AsistenciaRepository:
             cursor.close()
 
     # ── 6. REGISTRAR JUSTIFICACIÓN ───────────────────────────────────────────
-    def registrar_justificacion(self, id_usuario, motivo, descripcion, fecha):
-        cursor = self.connection.cursor()
+    def registrar_justificacion(self, id_usuario, motivo, descripcion, fecha, ruta_sustento=None):
         try:
-            # 1. Buscar si ya existe una asistencia para esa fecha
-            sql_buscar = """
-                SELECT idAsistencias 
-                FROM ASISTENCIAS 
-                WHERE idUsuario = %s AND DATE(fecha_hora_dispositivo) = %s
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
+        try:
+            # 1. Verificar si ya existe una asistencia para esa fecha
+            sql_check = """
+                SELECT idAsistencias FROM ASISTENCIAS 
+                WHERE idUsuario = %s AND (DATE(fecha_hora_servidor) = %s OR DATE(fecha_hora_dispositivo) = %s)
                 ORDER BY idAsistencias DESC LIMIT 1
             """
-            cursor.execute(sql_buscar, (id_usuario, fecha))
+            cursor.execute(sql_check, (id_usuario, fecha, fecha))
             asistencia = cursor.fetchone()
 
-            # 2. Si no marcó asistencia, se crea el registro previo de FALTA (cumpliendo FK idAsistencias NOT NULL)
-            if not asistencia:
-                sql_crear_asistencia = """
+            if asistencia:
+                id_asistencia = asistencia['idAsistencias'] if isinstance(asistencia, dict) else asistencia[0]
+            else:
+                # Si no existe asistencia previa, se crea el registro de FALTA
+                sql_insert_asistencia = """
                     INSERT INTO ASISTENCIAS (
-                        tipo, fecha_hora_dispositivo, estado, minutos_tardanza, 
-                        marcacion_observada, observacion, idUsuario
+                        idUsuario, tipo, estado, fecha_hora_servidor, fecha_hora_dispositivo, observacion
                     ) VALUES (
-                        'INGRESO', CONCAT(%s, ' 09:00:00'), 'FALTA', 0, 
-                        1, 'Inasistencia con justificación', %s
+                        %s, 'INGRESO', 'FALTA', NOW(), CONCAT(%s, ' 09:00:00'), 'Inasistencia con justificación'
                     )
                 """
-                cursor.execute(sql_crear_asistencia, (fecha, id_usuario))
+                cursor.execute(sql_insert_asistencia, (id_usuario, fecha))
                 id_asistencia = cursor.lastrowid
-            else:
-                id_asistencia = asistencia.get("idAsistencias") if isinstance(asistencia, dict) else asistencia[0]
 
-            # 3. Insertar o actualizar justificación (evitando duplicado en UNIQUE idAsistencias)
-            sql_check_just = "SELECT idJustificacion FROM JUSTIFICACIONES WHERE idAsistencias = %s"
-            cursor.execute(sql_check_just, (id_asistencia,))
-            existe_just = cursor.fetchone()
-
-            if existe_just:
-                sql_upsert = """
-                    UPDATE JUSTIFICACIONES 
-                    SET motivo = %s, descripcion = %s, estado = 'PENDIENTE', fecha_registro = CURRENT_TIMESTAMP
-                    WHERE idAsistencias = %s
-                """
-                cursor.execute(sql_upsert, (motivo, descripcion, id_asistencia))
-            else:
-                sql_upsert = """
-                    INSERT INTO JUSTIFICACIONES (motivo, descripcion, estado, idAsistencias, idUsuario)
-                    VALUES (%s, %s, 'PENDIENTE', %s, %s)
-                """
-                cursor.execute(sql_upsert, (motivo, descripcion, id_asistencia, id_usuario))
-
+            # 2. Insertar o actualizar fila en la tabla JUSTIFICACIONES (idAsistencias es UNIQUE)
+            sql_justificacion = """
+                INSERT INTO JUSTIFICACIONES (
+                    idAsistencias, idUsuario, motivo, descripcion, estado, ruta_sustento, fecha_registro
+                )
+                VALUES (%s, %s, %s, %s, 'PENDIENTE', %s, NOW())
+                ON DUPLICATE KEY UPDATE
+                    motivo = VALUES(motivo),
+                    descripcion = VALUES(descripcion),
+                    ruta_sustento = VALUES(ruta_sustento),
+                    estado = 'PENDIENTE',
+                    fecha_registro = NOW()
+            """
+            cursor.execute(sql_justificacion, (id_asistencia, id_usuario, motivo, descripcion, ruta_sustento))
             self.connection.commit()
-            return {"idAsistencias": id_asistencia, "idUsuario": id_usuario, "estado": "ENVIADA"}
+
+            id_justificacion = cursor.lastrowid
+            if not id_justificacion:
+                cursor.execute(
+                    "SELECT idJustificacion FROM JUSTIFICACIONES WHERE idAsistencias = %s LIMIT 1",
+                    (id_asistencia,)
+                )
+                row_j = cursor.fetchone()
+                id_justificacion = row_j["idJustificacion"] if isinstance(row_j, dict) else row_j[0]
+
+            return {
+                "idJustificacion": id_justificacion,
+                "idAsistencias": id_asistencia,
+                "idUsuario": id_usuario,
+                "estado": "PENDIENTE"
+            }
         except Exception as e:
             self.connection.rollback()
             raise e
@@ -330,27 +371,58 @@ class AsistenciaRepository:
             cursor.close()
 
     # ── 9. REVISAR (APROBAR/RECHAZAR) JUSTIFICACIÓN COMO ADMINISTRADOR ───────
-    def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
-        cursor = self.connection.cursor()
+    def revisar_justificacion(self, id_usuario=None, id_revisor=1, estado="APROBADA", comentario="", id_asistencias=None, **kwargs):
+        id_user = id_usuario if id_usuario is not None else kwargs.get("id_usuario_colaborador")
+        id_asist = id_asistencias if id_asistencias is not None else kwargs.get("idAsistencias")
+        est = estado if estado is not None else kwargs.get("estado_nuevo", "APROBADA")
+        com = comentario if comentario is not None else kwargs.get("comentario_admin", "")
+        rev = id_revisor if id_revisor is not None else kwargs.get("id_revisor", 1)
+
+        estado_enum = "APROBADA" if str(est).upper() in ["APROBADA", "APROBADO"] else "RECHAZADA"
+
         try:
-            # Mapeo de estados ('APROBADA', 'RECHAZADA')
-            estado_enum = 'APROBADA' if estado_nuevo.upper() in ['APROBADA', 'APROBADO'] else 'RECHAZADA'
-            
-            query = """
-                UPDATE JUSTIFICACIONES
-                SET 
-                    estado = %s,
-                    comentario_revision = %s,
-                    fecha_revision = NOW(),
-                    idRevisor = %s
-                WHERE idUsuario = %s AND estado = 'PENDIENTE'
-                ORDER BY idJustificacion DESC
-                LIMIT 1
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
+        try:
+            # 1. Ubicar la justificación a actualizar por idAsistencias o idUsuario
+            sql_get = """
+                SELECT j.idJustificacion, j.idAsistencias
+                FROM JUSTIFICACIONES j
+                WHERE (%s IS NOT NULL AND j.idAsistencias = %s)
+                   OR (%s IS NOT NULL AND j.idUsuario = %s)
+                ORDER BY j.idJustificacion DESC LIMIT 1
             """
-            cursor.execute(query, (estado_enum, comentario_admin, id_revisor, id_usuario_colaborador))
-            filas_afectadas = cursor.rowcount
+            cursor.execute(sql_get, (id_asist, id_asist, id_user, id_user))
+            row = cursor.fetchone()
+
+            if not row:
+                return False
+
+            id_justificacion = row["idJustificacion"] if isinstance(row, dict) else row[0]
+            id_asistencia = row["idAsistencias"] if isinstance(row, dict) else row[1]
+
+            # 2. Actualizar estado de la JUSTIFICACIÓN
+            sql_update_j = """
+                UPDATE JUSTIFICACIONES
+                SET estado = %s, comentario_revision = %s, idRevisor = %s, fecha_revision = NOW()
+                WHERE idJustificacion = %s
+            """
+            cursor.execute(sql_update_j, (estado_enum, com, rev, id_justificacion))
+
+            # 3. Si fue APROBADA, actualizar el estado de la ASISTENCIA a 'A_TIEMPO'
+            if estado_enum == "APROBADA":
+                cursor.execute("""
+                    UPDATE ASISTENCIAS
+                    SET estado = 'A_TIEMPO', observacion = CONCAT('Justificación Aprobada: ', COALESCE(%s, ''))
+                    WHERE idAsistencias = %s
+                """, (com, id_asistencia))
+
             self.connection.commit()
-            return filas_afectadas > 0
+            return True
+        except Exception as e:
+            self.connection.rollback()
+            raise e
         finally:
             cursor.close()
 

@@ -1,3 +1,4 @@
+import threading
 from datetime import datetime
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository
@@ -13,12 +14,14 @@ class AsistenciaService:
             repository = AsistenciaRepository(connection)
             row = repository.get_resumen()
 
-            total = row.get("total", 0) if row else 0
+            total = int(row.get("total", 0)) if row and row.get("total") else 0
             presentes = int(row.get("presentes", 0)) if row and row.get("presentes") else 0
             a_tiempo = int(row.get("aTiempo", 0)) if row and row.get("aTiempo") else 0
             tardanzas = int(row.get("tardanzas", 0)) if row and row.get("tardanzas") else 0
+            faltas = int(row.get("faltas", 0)) if row and row.get("faltas") else 0
+            sin_marcar = int(row.get("sinMarcar", 0)) if row and row.get("sinMarcar") else 0
 
-            porcentaje = round((presentes / total) * 100) if total > 0 else 0
+            porcentaje = row.get("porcentaje", round((presentes / total) * 100) if total > 0 else 0)
 
             data = {
                 "porcentaje": porcentaje,
@@ -26,6 +29,8 @@ class AsistenciaService:
                 "total": total,
                 "aTiempo": a_tiempo,
                 "tardanzas": tardanzas,
+                "faltas": faltas,
+                "sinMarcar": sin_marcar,
             }
 
             return data, "Resumen obtenido correctamente", 200
@@ -92,37 +97,126 @@ class AsistenciaService:
                 fecha_hora_disp=fecha_hora_disp
             )
 
-            return resultado, "Asistencia registrada correctamente", 201
+            mensaje_resp = resultado.get("message", "Asistencia registrada correctamente")
+            codigo_http = 200 if resultado.get("yaRegistrado") else 201
+
+            return resultado, mensaje_resp, codigo_http
         except Exception as e:
             return None, f"Error al marcar asistencia: {str(e)}", 500
         finally:
             connection.close()
 
     # ── POST /api/asistencias/justificar ──────────────────────────────────────
-    def registrar_justificacion(self, payload):
-        connection = get_connection()
-        try:
+    def registrar_justificacion(self, payload_or_id_usuario, motivo=None, descripcion=None, fecha=None, ruta_sustento=None):
+        if isinstance(payload_or_id_usuario, dict):
+            payload = payload_or_id_usuario
             id_usuario = payload.get("idUsuario")
             motivo = payload.get("motivo")
             descripcion = payload.get("descripcion") or payload.get("detalle")
             fecha = payload.get("fecha") or datetime.now().strftime("%Y-%m-%d")
+            ruta_sustento = payload.get("ruta_sustento") or payload.get("fotoSustento")
+        else:
+            id_usuario = payload_or_id_usuario
+            fecha = fecha or datetime.now().strftime("%Y-%m-%d")
 
-            if not id_usuario or not motivo or not descripcion:
-                return None, "idUsuario, motivo y descripción son requeridos", 400
+        if not id_usuario or not motivo or not descripcion:
+            return None, "idUsuario, motivo y descripción son requeridos", 400
 
+        connection = get_connection()
+        try:
             repository = AsistenciaRepository(connection)
             resultado = repository.registrar_justificacion(
                 id_usuario=id_usuario,
                 motivo=motivo,
                 descripcion=descripcion,
-                fecha=fecha
+                fecha=fecha,
+                ruta_sustento=ruta_sustento
             )
+
+            # Notificar en tiempo real a Administradores y Supervisores vía Push FCM (hilo daemon)
+            self._notificar_justificacion_en_segundo_plano(id_usuario, motivo)
 
             return resultado, "Justificación registrada exitosamente", 201
         except Exception as e:
             return None, f"Error al registrar justificación: {str(e)}", 500
         finally:
             connection.close()
+
+    @classmethod
+    def _notificar_justificacion_en_segundo_plano(cls, id_usuario, motivo):
+        """
+        Envía en segundo plano (daemon thread) la Notificación Push de nueva justificación
+        a todos los Administradores y Supervisores registrados.
+        """
+        def _job():
+            try:
+                conn = get_connection()
+                try:
+                    repo = AsistenciaRepository(conn)
+                    # 1. Obtener nombre completo del colaborador (nombres + apePaterno)
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "SELECT nombres, apePaterno FROM USUARIOS WHERE idUsuario = %s LIMIT 1",
+                        (id_usuario,)
+                    )
+                    user_row = cursor.fetchone()
+                    cursor.close()
+
+                    if user_row:
+                        nombres = (user_row.get("nombres") or "").strip()
+                        apePaterno = (user_row.get("apePaterno") or "").strip()
+                        nombre_colaborador = f"{nombres} {apePaterno}".strip() or "Un colaborador"
+                    else:
+                        nombre_colaborador = "Un colaborador"
+
+                    # 2. Obtener tokens FCM de USUARIO_DISPOSITIVO para Administradores y Supervisores
+                    dispositivos = repo.get_tokens_administradores_supervisores()
+                finally:
+                    conn.close()
+
+                if not dispositivos:
+                    print("[FCM Justificación] No se encontraron dispositivos activos para Administradores o Supervisores.")
+                    return
+
+                # 3. Construir mensaje Push FCM y Data Payload
+                titulo = "📩 Nueva Justificación Recibida"
+                body = f"{nombre_colaborador} envió un justificativo de {motivo} para su revisión."
+                data_payload = {
+                    "tipo": "JUSTIFICACION_RECIBIDA",
+                    "title": titulo,
+                    "body": body,
+                    "idUsuario": str(id_usuario)
+                }
+
+                # 4. Enviar notificación FCM a cada token único
+                tokens_procesados = set()
+                for d in dispositivos:
+                    token = d.get("fcm_token")
+                    id_destinatario = d.get("idUsuario")
+                    if not token or token in tokens_procesados:
+                        continue
+                    tokens_procesados.add(token)
+
+                    ok, det = FCMService.enviar_a_token(
+                        fcm_token=token,
+                        titulo=titulo,
+                        mensaje=body,
+                        data=data_payload
+                    )
+
+                    # Registrar en NOTIFICACIONES_LOG
+                    FCMService._guardar_log(
+                        idUsuario=id_destinatario,
+                        tipo="JUSTIFICACION_RECIBIDA",
+                        referencia=f"JUST-{id_usuario}",
+                        mensaje=body,
+                        resultado=det
+                    )
+            except Exception as e:
+                print(f"[FCM Justificación] Error en job de notificación en segundo plano: {e}")
+
+        t = threading.Thread(target=_job, daemon=True)
+        t.start()
 
     # ── GET /api/asistencias/justificacion/<idUsuario> ────────────────────────
     def obtener_justificacion_usuario(self, idUsuario):
@@ -146,20 +240,27 @@ class AsistenciaService:
         finally:
             connection.close()
 
-    def revisar_justificacion(self, id_usuario_colaborador, estado_nuevo, comentario_admin, id_revisor):
-        if not id_usuario_colaborador:
-            raise ValueError("El idUsuario del colaborador es obligatorio.")
-        if not estado_nuevo:
-            raise ValueError("El estadoNuevo ('APROBADA'/'RECHAZADA') es obligatorio.")
+    def revisar_justificacion(self, id_usuario=None, id_revisor=1, estado="APROBADA", comentario="", id_asistencias=None, **kwargs):
+        id_user = id_usuario if id_usuario is not None else kwargs.get("id_usuario_colaborador")
+        id_asist = id_asistencias if id_asistencias is not None else kwargs.get("idAsistencias")
+        est = estado if estado is not None else kwargs.get("estado_nuevo", "APROBADA")
+        com = comentario if comentario is not None else kwargs.get("comentario_admin", "")
+        rev = id_revisor if id_revisor is not None else kwargs.get("id_revisor", 1)
+
+        if not id_user and not id_asist:
+            raise ValueError("El idUsuario o idAsistencias es obligatorio.")
+        if not est:
+            raise ValueError("El estado ('APROBADA'/'RECHAZADA') es obligatorio.")
 
         connection = get_connection()
         try:
             repository = AsistenciaRepository(connection)
             return repository.revisar_justificacion(
-                id_usuario_colaborador, 
-                estado_nuevo, 
-                comentario_admin, 
-                id_revisor
+                id_usuario=id_user,
+                id_revisor=rev,
+                estado=est,
+                comentario=com,
+                id_asistencias=id_asist
             )
         finally:
             connection.close()
