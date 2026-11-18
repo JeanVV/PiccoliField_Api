@@ -161,9 +161,15 @@ class AsistenciaRepository:
                 cursor.execute(sql_check, (id_user,))
                 existente = cursor.fetchone()
                 if existente:
-                    id_asist = existente.get('idAsistencias') if isinstance(existente, dict) else existente[0]
-                    hora_str = (existente.get('hora') if isinstance(existente, dict) else existente[1]) or ""
-                    est_str = (existente.get('estado') if isinstance(existente, dict) else existente[2]) or 'A_TIEMPO'
+                    if isinstance(existente, dict):
+                        id_asist = existente.get('idAsistencias')
+                        hora_str = existente.get('hora') or ""
+                        est_str = existente.get('estado') or 'A_TIEMPO'
+                    else:
+                        id_asist = existente[0]
+                        hora_str = str(existente[1]) if len(existente) > 1 and existente[1] else ""
+                        est_str = str(existente[2]) if len(existente) > 2 and existente[2] else 'A_TIEMPO'
+
                     return {
                         "idAsistencias": id_asist,
                         "tipo": "INGRESO",
@@ -175,8 +181,16 @@ class AsistenciaRepository:
                     }
 
             # 3. INSERT a la tabla ASISTENCIAS
-            lat_val = float(latitud) if latitud is not None else -6.7711982
-            lng_val = float(longitud) if longitud is not None else -79.8385571
+            try:
+                lat_val = float(latitud) if latitud is not None and str(latitud).strip() not in ("", "null", "None") else -6.7711982
+            except (ValueError, TypeError):
+                lat_val = -6.7711982
+
+            try:
+                lng_val = float(longitud) if longitud is not None and str(longitud).strip() not in ("", "null", "None") else -79.8385571
+            except (ValueError, TypeError):
+                lng_val = -79.8385571
+
             obs = f"Sede: {sede or 'Chiclayo'} - Dir: {direccion or 'N/A'}"
 
             sql = """
