@@ -176,6 +176,7 @@ def revisar_justificacion():
 
 # ── 8. Notificación Push de Resumen Diario de Asistencias (10:30 AM / Manual) ────
 @asistencia_bp.route("/api/asistencias/notificar-resumen", methods=["GET", "POST"])
+@asistencia_bp.route("/notificar-resumen", methods=["GET", "POST"])
 def notificar_resumen():
     """
     Dispara manualmente el envío de la Notificación Push del Resumen Diario de Asistencias
