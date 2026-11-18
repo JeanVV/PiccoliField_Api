@@ -64,16 +64,14 @@ def obtener_historial(idUsuario):
 
 # ── 5. Marcar Asistencia (Ingreso / Salida) ──────────────────────────────────
 @asistencia_bp.route("/api/asistencias/marcar", methods=["POST"])
-@jwt_required()
+@asistencia_bp.route("/marcar", methods=["POST"])
+@jwt_required(optional=True)
 def marcar_asistencia():
-    payload = request.get_json() or {}
-    service = AsistenciaService()
-    data, message, http_code = service.registrar_asistencia(payload)
-
-    if data is None:
+    data = request.get_json() or {}
+    resultado, message, http_code = asistencia_service.marcar_asistencia(data)
+    if resultado is None:
         return error_response(message, http_code)
-
-    return success_response(data, message, http_code)
+    return success_response(resultado, message, http_code)
 
 
 # ── 6. Enviar Justificación de Inasistencia / Tardanza ───────────────────────
