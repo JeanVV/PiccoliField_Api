@@ -1,10 +1,15 @@
 import os
+import time
 import base64
 import threading
 from datetime import datetime
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository, get_now_peru
 from services.fcm_service import FCMService
+
+_idempotency_cache = {}
+_idempotency_lock = threading.Lock()
+IDEMPOTENCY_TTL_SECONDS = 600  # 10 minutos de ventana de idempotencia
 
 
 def guardar_foto_sustento(base64_str, id_usuario):
@@ -114,18 +119,35 @@ class AsistenciaService:
             connection.close()
 
     # ── POST /api/asistencias/marcar ─────────────────────────────────────────
-    def marcar_asistencia(self, payload_or_id_usuario, tipo=None, latitud=None, longitud=None, direccion=None, sede=None, fecha_hora_disp=None, **kwargs):
+    def marcar_asistencia(self, payload_or_id_usuario, tipo=None, latitud=None, longitud=None, direccion=None, sede=None, fecha_hora_disp=None, operation_id=None, **kwargs):
+        op_id = operation_id or kwargs.get("operation_id")
         if isinstance(payload_or_id_usuario, dict):
             payload = payload_or_id_usuario
             id_usuario = payload.get("idUsuario")
             tipo = payload.get("tipo")
             latitud = payload.get("latitud")
             longitud = payload.get("longitud")
-            direccion = payload.get("direccion")
-            sede = payload.get("sede")
-            fecha_hora_disp = payload.get("fechaHoraDispositivo")
+            direccion = payload.get("direccion") or payload.get("ubicacion")
+            sede = payload.get("sede") or payload.get("nombreSede")
+            fecha_hora_disp = payload.get("fechaHoraDispositivo") or payload.get("fecha_hora_disp")
+            if not op_id:
+                op_id = payload.get("operationId") or payload.get("x_operation_id") or payload.get("X-Operation-Id")
         else:
             id_usuario = payload_or_id_usuario
+
+        # 1. Validar Idempotencia con X-Operation-Id
+        if op_id:
+            cache_key = f"{id_usuario}_{op_id}"
+            with _idempotency_lock:
+                now_ts = time.time()
+                expired = [k for k, v in _idempotency_cache.items() if now_ts - v.get("timestamp", 0) > IDEMPOTENCY_TTL_SECONDS]
+                for k in expired:
+                    del _idempotency_cache[k]
+
+                if cache_key in _idempotency_cache:
+                    cached = _idempotency_cache[cache_key]
+                    print(f"[IDEMPOTENCIA] Retornando respuesta almacenada para X-Operation-Id: {op_id}")
+                    return cached["data"], cached["message"], cached["code"]
 
         if not id_usuario or not tipo:
             return None, "idUsuario y tipo son requeridos", 400
@@ -144,6 +166,17 @@ class AsistenciaService:
             )
             msg = resultado.get("mensaje") or resultado.get("message") or "Asistencia registrada correctamente"
             codigo_http = 200 if resultado.get("yaRegistrado") else 201
+
+            # Guardar respuesta en caché de idempotencia si se envió X-Operation-Id
+            if op_id and resultado is not None:
+                with _idempotency_lock:
+                    _idempotency_cache[f"{id_usuario}_{op_id}"] = {
+                        "data": resultado,
+                        "message": msg,
+                        "code": codigo_http,
+                        "timestamp": time.time()
+                    }
+
             return resultado, msg, codigo_http
         except Exception as e:
             return None, f"Error al marcar asistencia: {str(e)}", 500
@@ -153,17 +186,30 @@ class AsistenciaService:
     registrar_asistencia = marcar_asistencia
 
     # ── POST /api/asistencias/justificar ──────────────────────────────────────
-    def registrar_justificacion(self, payload_or_id_usuario, motivo=None, descripcion=None, fecha=None, ruta_sustento=None):
+    def registrar_justificacion(self, payload_or_id_usuario, motivo=None, descripcion=None, fecha=None, ruta_sustento=None, operation_id=None, **kwargs):
+        op_id = operation_id or kwargs.get("operation_id")
         if isinstance(payload_or_id_usuario, dict):
             payload = payload_or_id_usuario
             id_usuario = payload.get("idUsuario")
             motivo = payload.get("motivo")
             descripcion = payload.get("descripcion") or payload.get("detalle")
             fecha = payload.get("fecha") or get_now_peru().strftime("%Y-%m-%d")
-            ruta_sustento = payload.get("ruta_sustento") or payload.get("fotoSustento")
+            ruta_sustento = payload.get("fotoSustentoBase64") or payload.get("ruta_sustento") or payload.get("fotoSustento")
+            if not op_id:
+                op_id = payload.get("operationId") or payload.get("x_operation_id") or payload.get("X-Operation-Id")
         else:
             id_usuario = payload_or_id_usuario
             fecha = fecha or get_now_peru().strftime("%Y-%m-%d")
+
+        # 1. Validar Idempotencia con X-Operation-Id si se envió
+        if op_id:
+            cache_key = f"just_{id_usuario}_{op_id}"
+            with _idempotency_lock:
+                now_ts = time.time()
+                if cache_key in _idempotency_cache and (now_ts - _idempotency_cache[cache_key].get("timestamp", 0) <= IDEMPOTENCY_TTL_SECONDS):
+                    cached = _idempotency_cache[cache_key]
+                    print(f"[IDEMPOTENCIA JUSTIFICACION] Retornando respuesta almacenada para X-Operation-Id: {op_id}")
+                    return cached["data"], cached["message"], cached["code"]
 
         if not id_usuario or not motivo or not descripcion:
             return None, "idUsuario, motivo y descripción son requeridos", 400
@@ -182,6 +228,16 @@ class AsistenciaService:
                 fecha=fecha,
                 ruta_sustento=ruta_sustento
             )
+
+            # Guardar en caché de idempotencia si se proporcionó operation_id
+            if op_id and resultado is not None:
+                with _idempotency_lock:
+                    _idempotency_cache[f"just_{id_usuario}_{op_id}"] = {
+                        "data": resultado,
+                        "message": "Justificación registrada exitosamente",
+                        "code": 201,
+                        "timestamp": time.time()
+                    }
 
             # Notificar en tiempo real a Administradores y Supervisores vía Push FCM (hilo daemon)
             self._notificar_justificacion_en_segundo_plano(id_usuario, motivo)

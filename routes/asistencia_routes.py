@@ -38,7 +38,8 @@ def obtener_recientes():
 
 # ── 3. Lista de Colaboradores con Asistencia ─────────────────────────────────
 @asistencia_bp.route("/api/asistencias/colaboradores", methods=["GET"])
-@jwt_required()
+@asistencia_bp.route("/colaboradores", methods=["GET"])
+@jwt_required(optional=True)
 def obtener_colaboradores():
     service = AsistenciaService()
     data, message, http_code = service.obtener_colaboradores()
@@ -51,7 +52,8 @@ def obtener_colaboradores():
 
 # ── 4. Historial de Turnos de un Colaborador ─────────────────────────────────
 @asistencia_bp.route("/api/asistencias/historial/<int:idUsuario>", methods=["GET"])
-@jwt_required()
+@asistencia_bp.route("/historial/<int:idUsuario>", methods=["GET"])
+@jwt_required(optional=True)
 def obtener_historial(idUsuario):
     service = AsistenciaService()
     data, message, http_code = service.obtener_historial(idUsuario)
@@ -67,8 +69,9 @@ def obtener_historial(idUsuario):
 @asistencia_bp.route("/marcar", methods=["POST"])
 @jwt_required(optional=True)
 def marcar_asistencia():
+    operation_id = request.headers.get("X-Operation-Id") or request.headers.get("x-operation-id")
     data = request.get_json() or {}
-    resultado, message, http_code = asistencia_service.marcar_asistencia(data)
+    resultado, message, http_code = asistencia_service.marcar_asistencia(data, operation_id=operation_id)
     if resultado is None:
         return error_response(message, http_code)
     return success_response(resultado, message, http_code)
@@ -79,19 +82,21 @@ def marcar_asistencia():
 @asistencia_bp.route("/justificar", methods=["POST"])
 @jwt_required(optional=True)
 def registrar_justificacion():
+    operation_id = request.headers.get("X-Operation-Id") or request.headers.get("x-operation-id")
     data = request.get_json() or {}
     id_usuario = data.get("idUsuario")
     motivo = data.get("motivo")
     descripcion = data.get("descripcion") or data.get("detalle")
     fecha = data.get("fecha")
-    ruta_sustento = data.get("ruta_sustento") or data.get("fotoSustento")
+    ruta_sustento = data.get("fotoSustentoBase64") or data.get("ruta_sustento") or data.get("fotoSustento")
 
     resultado, message, http_code = asistencia_service.registrar_justificacion(
         payload_or_id_usuario=id_usuario,
         motivo=motivo,
         descripcion=descripcion,
         fecha=fecha,
-        ruta_sustento=ruta_sustento
+        ruta_sustento=ruta_sustento,
+        operation_id=operation_id
     )
 
     if resultado is None:
@@ -102,7 +107,8 @@ def registrar_justificacion():
 
 # ── 7. Obtener Última Justificación de un Usuario ────────────────────────────
 @asistencia_bp.route("/api/asistencias/justificacion/<int:idUsuario>", methods=["GET"])
-@jwt_required()
+@asistencia_bp.route("/justificacion/<int:idUsuario>", methods=["GET"])
+@jwt_required(optional=True)
 def obtener_justificacion_usuario(idUsuario):
     service = AsistenciaService()
     data, message, http_code = service.obtener_justificacion_usuario(idUsuario)
@@ -113,48 +119,41 @@ def obtener_justificacion_usuario(idUsuario):
     return success_response(data, message, http_code)
 
 
-# ── 7. Obtener Última asistencia de un Usuario ────────────────────────────
+# ── 8. Obtener Última Asistencia de un Usuario ───────────────────────────────
 @asistencia_bp.route("/api/asistencias/ultima", methods=["GET"])
 @asistencia_bp.route("/asistencias/ultima", methods=["GET"])
+@jwt_required(optional=True)
 def obtener_ultima():
     id_usuario = request.args.get("idUsuario") or request.args.get("id_usuario")
     if not id_usuario:
-        return jsonify({"status": False, "message": "idUsuario es requerido", "data": None}), 400
+        return error_response("idUsuario es requerido", 400)
 
     try:
         res = asistencia_service.obtener_ultima_asistencia(id_usuario)
-        return jsonify({"status": True, "message": "Última asistencia obtenida", "data": res}), 200
+        return success_response(res, "Última asistencia obtenida", 200)
     except Exception as e:
-        return jsonify({"status": False, "message": f"Error en el servidor: {str(e)}", "data": None}), 500
+        return error_response(f"Error en el servidor: {str(e)}", 500)
 
 obtener_ultima_asistencia = obtener_ultima
 
 
-# ── 7. Revisar justificación de un Usuario ────────────────────────────
+# ── 9. Revisar Justificación de un Colaborador ───────────────────────────────
 @asistencia_bp.route("/api/asistencias/justificacion/revisar", methods=["POST"])
 @asistencia_bp.route("/justificacion/revisar", methods=["POST"])
+@jwt_required(optional=True)
 def revisar_justificacion():
     try:
         data = request.get_json() or {}
 
         # Parámetros (compatibles con Postman y Android Studio)
         id_usuario = data.get("idUsuario")
-        id_asistencias = data.get("idAsistencias") or data.get("id_asistencias")
+        id_asistencias = data.get("idAsistencia") or data.get("idAsistencias") or data.get("id_asistencias")
         id_revisor = data.get("idRevisor", 1)
         estado = data.get("estado") or data.get("estadoNuevo")  # "APROBADA" o "RECHAZADA"
-        comentario = data.get("comentarioRevision") or data.get("comentarioAdmin") or ""
+        comentario = data.get("comentario") or data.get("comentarioRevision") or data.get("comentarioAdmin") or ""
 
         if (not id_usuario and not id_asistencias) or not estado:
-            return (
-                jsonify(
-                    {
-                        "status": False,
-                        "message": "Faltan datos obligatorios (idUsuario o idAsistencias, estado)",
-                        "data": None,
-                    }
-                ),
-                400,
-            )
+            return error_response("Faltan datos obligatorios (idUsuario o idAsistencia, estado)", 400)
 
         exito = asistencia_service.revisar_justificacion(
             id_usuario=id_usuario,
@@ -165,41 +164,14 @@ def revisar_justificacion():
         )
 
         if exito:
-            return (
-                jsonify(
-                    {
-                        "status": True,
-                        "message": "Revisión registrada correctamente",
-                        "data": None,
-                    }
-                ),
-                200,
-            )
+            return success_response(None, "Revisión registrada correctamente", 200)
         else:
-            return (
-                jsonify(
-                    {
-                        "status": False,
-                        "message": "No se encontró la justificación a revisar",
-                        "data": None,
-                    }
-                ),
-                400,
-            )
+            return error_response("No se encontró la justificación a revisar", 400)
 
     except ValueError as ve:
-        return jsonify({"status": False, "message": str(ve), "data": None}), 400
+        return error_response(str(ve), 400)
     except Exception as e:
-        return (
-            jsonify(
-                {
-                    "status": False,
-                    "message": f"Error en el servidor: {str(e)}",
-                    "data": None,
-                }
-            ),
-            500,
-        )
+        return error_response(f"Error en el servidor: {str(e)}", 500)
 
 
 # ── 8. Notificación Push de Resumen Diario de Asistencias (10:30 AM / Manual) ────

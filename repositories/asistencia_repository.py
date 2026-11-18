@@ -150,7 +150,35 @@ class AsistenciaRepository:
                 if row_first:
                     id_user = row_first['idUsuario'] if isinstance(row_first, dict) else row_first[0]
 
-            # 2. INSERT ultra simple y directo a la tabla ASISTENCIAS
+            # 2. Control de duplicados el mismo día para INGRESO
+            if tipo_upper == 'INGRESO':
+                sql_check = """
+                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora, estado
+                    FROM ASISTENCIAS
+                    WHERE idUsuario = %s AND tipo = 'INGRESO' AND DATE(fecha_hora_servidor) = CURDATE()
+                    LIMIT 1
+                """
+                cursor.execute(sql_check, (id_user,))
+                existente = cursor.fetchone()
+                if existente:
+                    id_asist = existente.get('idAsistencias') if isinstance(existente, dict) else existente[0]
+                    hora_str = (existente.get('hora') if isinstance(existente, dict) else existente[1]) or ""
+                    est_str = (existente.get('estado') if isinstance(existente, dict) else existente[2]) or 'A_TIEMPO'
+                    return {
+                        "idAsistencias": id_asist,
+                        "tipo": "INGRESO",
+                        "estado": est_str,
+                        "minutosTardanza": 0,
+                        "yaRegistrado": True,
+                        "mensaje": f"Ya has registrado tu ingreso hoy a las {hora_str}",
+                        "message": f"Ya has registrado tu ingreso hoy a las {hora_str}"
+                    }
+
+            # 3. INSERT a la tabla ASISTENCIAS
+            lat_val = float(latitud) if latitud is not None else -6.7711982
+            lng_val = float(longitud) if longitud is not None else -79.8385571
+            obs = f"Sede: {sede or 'Chiclayo'} - Dir: {direccion or 'N/A'}"
+
             sql = """
                 INSERT INTO ASISTENCIAS (
                     tipo, fecha_hora_servidor, fecha_hora_dispositivo, estado,
@@ -158,12 +186,11 @@ class AsistenciaRepository:
                     marcacion_observada, observacion, idUsuario
                 ) VALUES (
                     %s, NOW(), NOW(), 'A_TIEMPO',
-                    0, -6.7711982, -79.8385571, 100.0, 5.0,
+                    0, %s, %s, 100.0, 5.0,
                     0, %s, %s
                 )
             """
-            obs = f"Sede: {sede or 'Chiclayo'} - Dir: {direccion or 'N/A'}"
-            cursor.execute(sql, (tipo_upper, obs, id_user))
+            cursor.execute(sql, (tipo_upper, lat_val, lng_val, obs, id_user))
             self.connection.commit()
 
             id_nuevo = cursor.lastrowid
