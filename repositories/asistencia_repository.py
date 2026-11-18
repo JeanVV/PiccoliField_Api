@@ -302,13 +302,18 @@ class AsistenciaRepository:
 
     # ── 8. OBTENER ÚLTIMA ASISTENCIA DEL USUARIO ─────────────────────────────
     def obtener_ultima_asistencia(self, id_usuario):
-        cursor = self.connection.cursor()
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
         try:
             query = """
                 SELECT 
                     idAsistencias AS id,
                     DATE_FORMAT(fecha_hora_servidor, '%Y-%m-%d') AS fecha,
                     DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora,
+                    tipo,
+                    estado,
                     latitud,
                     longitud,
                     observacion AS direccion
@@ -322,10 +327,22 @@ class AsistenciaRepository:
             
             # Convertir Decimal de MySQL a float para evitar error de serialización JSON
             if resultado:
-                if resultado.get('latitud') is not None:
-                    resultado['latitud'] = float(resultado['latitud'])
-                if resultado.get('longitud') is not None:
-                    resultado['longitud'] = float(resultado['longitud'])
+                if isinstance(resultado, dict):
+                    if resultado.get('latitud') is not None:
+                        resultado['latitud'] = float(resultado['latitud'])
+                    if resultado.get('longitud') is not None:
+                        resultado['longitud'] = float(resultado['longitud'])
+                else:
+                    resultado = {
+                        "id": resultado[0],
+                        "fecha": resultado[1],
+                        "hora": resultado[2],
+                        "tipo": resultado[3],
+                        "estado": resultado[4],
+                        "latitud": float(resultado[5]) if resultado[5] is not None else None,
+                        "longitud": float(resultado[6]) if resultado[6] is not None else None,
+                        "direccion": resultado[7]
+                    }
             
             return resultado
         finally:

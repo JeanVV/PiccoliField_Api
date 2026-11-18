@@ -115,60 +115,19 @@ def obtener_justificacion_usuario(idUsuario):
 
 # ── 7. Obtener Última asistencia de un Usuario ────────────────────────────
 @asistencia_bp.route("/api/asistencias/ultima", methods=["GET"])
-def obtener_ultima_asistencia():
+@asistencia_bp.route("/asistencias/ultima", methods=["GET"])
+def obtener_ultima():
+    id_usuario = request.args.get("idUsuario") or request.args.get("id_usuario")
+    if not id_usuario:
+        return jsonify({"status": False, "message": "idUsuario es requerido", "data": None}), 400
+
     try:
-        # Obtener el idUsuario (desde token JWT autenticado o parámetro query)
-        # id_usuario = current_user.get('idUsuario')
-        id_usuario = request.args.get("idUsuario", type=int)
-
-        if not id_usuario:
-            return (
-                jsonify(
-                    {
-                        "status": False,
-                        "message": "Falta el idUsuario en la petición",
-                        "data": None,
-                    }
-                ),
-                400,
-            )
-
-        ultima = asistencia_service.obtener_ultima_asistencia(id_usuario)
-
-        if ultima:
-            return (
-                jsonify(
-                    {
-                        "status": True,
-                        "message": "Última asistencia obtenida correctamente",
-                        "data": ultima,
-                    }
-                ),
-                200,
-            )
-        else:
-            return (
-                jsonify(
-                    {
-                        "status": True,
-                        "message": "No hay marcas de asistencia registradas",
-                        "data": None,
-                    }
-                ),
-                200,
-            )
-
+        res = asistencia_service.obtener_ultima_asistencia(id_usuario)
+        return jsonify({"status": True, "message": "Última asistencia obtenida", "data": res}), 200
     except Exception as e:
-        return (
-            jsonify(
-                {
-                    "status": False,
-                    "message": f"Error en el servidor: {str(e)}",
-                    "data": None,
-                }
-            ),
-            500,
-        )
+        return jsonify({"status": False, "message": f"Error en el servidor: {str(e)}", "data": None}), 500
+
+obtener_ultima_asistencia = obtener_ultima
 
 
 # ── 7. Revisar justificación de un Usuario ────────────────────────────
