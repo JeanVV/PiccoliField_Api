@@ -11,6 +11,7 @@ from routes.impulsador_routes import impulsador_bp
 from routes.dispositivo_routes import dispositivo_bp
 from routes.pedido_routes import pedido_bp
 from routes.producto_routes import producto_bp
+from routes.prospecto_routes import prospecto_bp
 from utils.scheduler import iniciar_scheduler
 
 
@@ -31,6 +32,7 @@ def create_app():
     app.register_blueprint(dispositivo_bp)
     app.register_blueprint(pedido_bp)
     app.register_blueprint(producto_bp)
+    app.register_blueprint(prospecto_bp)
 
     @app.get("/")
     def inicio():
