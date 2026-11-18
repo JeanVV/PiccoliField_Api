@@ -4,19 +4,63 @@ from repositories.prospecto_repository import ProspectoRepository
 from repositories.usuario_repository import UsuarioRepository
 
 
+def normalizar_estado_prospecto(estado_str):
+    if not estado_str:
+        return None
+    s = str(estado_str).strip().upper().replace(" ", "_").replace("-", "_")
+    # Remover acentos
+    s = s.replace("Á", "A").replace("É", "E").replace("Í", "I").replace("Ó", "O").replace("Ú", "U")
+
+    # Mapeos al ENUM('NUEVO', 'EN_NEGOCIACION', 'CONVERTIDO', 'DESCARTADO')
+    if s in ("EN_NEGOCIACION", "NEGOCIACION", "NEGOCIAR", "CONTACTADO", "CONTACTO", "EN_PROCESO"):
+        return "EN_NEGOCIACION"
+
+    if s in ("CONVERTIDO", "CONVERTIR", "CONVERSION", "GANADO", "CLIENTE", "PDV"):
+        return "CONVERTIDO"
+
+    if s in ("DESCARTADO", "DESCARTAR", "RECHAZADO", "RECHAZAR", "PERDIDO", "CANCELADO"):
+        return "DESCARTADO"
+
+    if s in ("NUEVO", "INICIAL", "REGISTRADO"):
+        return "NUEVO"
+
+    if s in ("NUEVO", "EN_NEGOCIACION", "CONVERTIDO", "DESCARTADO"):
+        return s
+
+    return None
+
+
 class ProspectoService:
 
     def listar_prospectos(self, estado=None, potencial=None, idDistrito=None, idUsuario=None, search=None):
         connection = get_connection()
         try:
+            # Normalizar estado de búsqueda si viene como NEGOCIACION, RECHAZADO, etc.
+            estado_norm = normalizar_estado_prospecto(estado) if estado else None
+
             repo = ProspectoRepository(connection)
             prospectos = repo.listar(
-                estado=estado,
+                estado=estado_norm,
                 potencial=potencial,
                 idDistrito=idDistrito,
                 idUsuario=idUsuario,
                 search=search
             )
+
+            # Enriquecer cada prospecto con alias útiles (id, nombre, estado_label)
+            for p in (prospectos or []):
+                p["id"] = p.get("idProspectos")
+                p["nombre"] = p.get("nombre_comercial")
+                est = str(p.get("estado", "")).upper()
+                if est == "EN_NEGOCIACION":
+                    p["estado_label"] = "En Negociación"
+                elif est == "CONVERTIDO":
+                    p["estado_label"] = "Convertido"
+                elif est == "DESCARTADO":
+                    p["estado_label"] = "Descartado"
+                else:
+                    p["estado_label"] = "Nuevo"
+
             return prospectos, "Prospectos obtenidos correctamente", 200
         except Exception as e:
             traceback.print_exc()
@@ -35,6 +79,18 @@ class ProspectoService:
             # Adjuntar seguimientos
             seguimientos = repo.listar_seguimientos(idProspectos)
             prospecto["seguimientos"] = seguimientos
+            prospecto["id"] = prospecto.get("idProspectos")
+            prospecto["nombre"] = prospecto.get("nombre_comercial")
+
+            est = str(prospecto.get("estado", "")).upper()
+            if est == "EN_NEGOCIACION":
+                prospecto["estado_label"] = "En Negociación"
+            elif est == "CONVERTIDO":
+                prospecto["estado_label"] = "Convertido"
+            elif est == "DESCARTADO":
+                prospecto["estado_label"] = "Descartado"
+            else:
+                prospecto["estado_label"] = "Nuevo"
 
             return prospecto, "Prospecto obtenido correctamente", 200
         except Exception as e:
@@ -46,11 +102,11 @@ class ProspectoService:
     def crear_prospecto(self, idUsuarioAutenticado, payload):
         connection = get_connection()
         try:
-            nombre_comercial = payload.get("nombre_comercial")
+            nombre_comercial = payload.get("nombre_comercial") or payload.get("nombre")
             direccion = payload.get("direccion")
-            latitud = payload.get("latitud")
-            longitud = payload.get("longitud")
-            idDistrito = payload.get("idDistrito")
+            latitud = payload.get("latitud") or payload.get("lat")
+            longitud = payload.get("longitud") or payload.get("lng")
+            idDistrito = payload.get("idDistrito") or payload.get("distrito_id")
 
             if not nombre_comercial or not direccion:
                 return None, "Los campos 'nombre_comercial' y 'direccion' son obligatorios", 400
@@ -68,27 +124,27 @@ class ProspectoService:
             except (ValueError, TypeError):
                 return None, "Latitud, longitud o idDistrito tienen formatos numéricos inválidos", 400
 
-            idUsuarioAsignado = payload.get("idUsuario") or idUsuarioAutenticado
+            idUsuarioAsignado = payload.get("idUsuario") or payload.get("idPromotor") or idUsuarioAutenticado
 
             potencial = str(payload.get("potencial", "MEDIO")).strip().upper()
             if potencial not in ("ALTO", "MEDIO", "BAJO"):
                 potencial = "MEDIO"
 
-            estado_inicial = str(payload.get("estado", "NUEVO")).strip().upper()
-            if estado_inicial not in ("NUEVO", "EN_NEGOCIACION", "CONVERTIDO", "DESCARTADO"):
-                estado_inicial = "NUEVO"
+            # Normalizar estado inicial (si envían NEGOCIACION -> EN_NEGOCIACION)
+            estado_raw = payload.get("estado", "NUEVO")
+            estado_inicial = normalizar_estado_prospecto(estado_raw) or "NUEVO"
 
             data_insert = {
-                "nombre_comercial": nombre_comercial.strip(),
-                "tipo_local": payload.get("tipo_local"),
-                "direccion": direccion.strip(),
+                "nombre_comercial": str(nombre_comercial).strip(),
+                "tipo_local": payload.get("tipo_local") or payload.get("tipo"),
+                "direccion": str(direccion).strip(),
                 "contacto": payload.get("contacto"),
                 "telefono": payload.get("telefono"),
                 "potencial": potencial,
                 "estado": estado_inicial,
                 "notas": payload.get("notas"),
                 "motivo_descarte": payload.get("motivo_descarte"),
-                "url_foto": payload.get("url_foto"),
+                "url_foto": payload.get("url_foto") or payload.get("foto"),
                 "latitud": latitud,
                 "longitud": longitud,
                 "idDistrito": idDistrito,
@@ -127,6 +183,12 @@ class ProspectoService:
             if not prospecto:
                 return None, "Prospecto no encontrado", 404
 
+            # Si viene cambio de estado dentro del payload general, normalizarlo
+            if "estado" in payload and payload["estado"]:
+                nuevo_est = normalizar_estado_prospecto(payload["estado"])
+                if nuevo_est:
+                    payload["estado"] = nuevo_est
+
             actualizado = repo.actualizar(idProspectos, payload)
             return actualizado, "Prospecto actualizado correctamente", 200
         except Exception as e:
@@ -141,25 +203,29 @@ class ProspectoService:
             if not nuevo_estado:
                 return None, "El campo 'estado' es obligatorio", 400
 
-            nuevo_estado = str(nuevo_estado).strip().upper()
-            estados_validos = ("NUEVO", "EN_NEGOCIACION", "CONVERTIDO", "DESCARTADO")
-            if nuevo_estado not in estados_validos:
-                return None, f"Estado inválido. Valores permitidos: {', '.join(estados_validos)}", 400
+            # Normalizar estado: NEGOCIACION -> EN_NEGOCIACION, RECHAZAR/RECHAZADO -> DESCARTADO
+            estado_normalizado = normalizar_estado_prospecto(nuevo_estado)
+
+            if not estado_normalizado:
+                return None, (
+                    f"Estado inválido '{nuevo_estado}'. "
+                    "Valores permitidos en base de datos: NUEVO, EN_NEGOCIACION, CONVERTIDO, DESCARTADO"
+                ), 400
 
             repo = ProspectoRepository(connection)
             prospecto = repo.buscar_por_id(idProspectos)
             if not prospecto:
-                return None, "Prospecto no encontrado", 404
+                return None, f"Prospecto con ID {idProspectos} no encontrado", 404
 
             prospecto_act, punto_venta = repo.actualizar_estado(
                 idProspectos=idProspectos,
-                nuevo_estado=nuevo_estado,
+                nuevo_estado=estado_normalizado,
                 motivo_descarte=motivo_descarte,
                 idUsuarioRevisor=idUsuarioRevisor
             )
 
-            mensaje = f"Estado del prospecto actualizado a {nuevo_estado}"
-            if nuevo_estado == "CONVERTIDO" and punto_venta:
+            mensaje = f"Estado del prospecto actualizado a {estado_normalizado}"
+            if estado_normalizado == "CONVERTIDO" and punto_venta:
                 mensaje = "Prospecto convertido exitosamente a Punto de Venta (Distribución)"
 
             return {
