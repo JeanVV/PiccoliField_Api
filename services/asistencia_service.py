@@ -1,8 +1,10 @@
 import os
 import time
 import base64
+import shutil
 import threading
 from datetime import datetime
+from config import BASE_DIR, Config
 from database import get_connection
 from repositories.asistencia_repository import AsistenciaRepository, get_now_peru
 from services.fcm_service import FCMService
@@ -13,36 +15,42 @@ IDEMPOTENCY_TTL_SECONDS = 600  # 10 minutos de ventana de idempotencia
 
 
 def guardar_foto_sustento(base64_str, id_usuario):
-    if not base64_str or len(str(base64_str)) < 100:
-        return base64_str  # Si ya es una URL o ruta corta, la devuelve tal cual
+    if not base64_str:
+        return None
+
+    raw_str = str(base64_str).strip()
+    if len(raw_str) < 100 and (raw_str.startswith("uploads/") or raw_str.startswith("http")):
+        return raw_str  # Si ya es una ruta corta existente
 
     try:
-        raw_b64 = str(base64_str)
-        # Limpiar prefijo data:image si existiera
-        if "," in raw_b64:
-            raw_b64 = raw_b64.split(",")[1]
+        if "base64," in raw_str:
+            encoded_data = raw_str.split("base64,", 1)[1]
+        elif "," in raw_str:
+            encoded_data = raw_str.split(",", 1)[1]
+        else:
+            encoded_data = raw_str
 
-        image_data = base64.b64decode(raw_b64)
-        folder = os.path.join("uploads", "justificaciones")
+        image_data = base64.b64decode(encoded_data)
+        folder = os.path.join(BASE_DIR, "uploads", "justificaciones")
         os.makedirs(folder, exist_ok=True)
 
-        filename = f"sustento_{id_usuario}_{int(datetime.now().timestamp())}.jpg"
-        filepath = os.path.join(folder, filename)
+        ts = int(time.time())
+        nombre_archivo = f"justif_{id_usuario}_{ts}.jpg"
+        filepath = os.path.join(folder, nombre_archivo)
 
         with open(filepath, "wb") as f:
             f.write(image_data)
 
-        # Copia de compatibilidad en static/uploads/justificaciones
+        # Copia de compatibilidad en sustento_{id_usuario}_{ts}.jpg y justif_{id_usuario}.jpg
         try:
-            static_folder = os.path.join("static", "uploads", "justificaciones")
-            os.makedirs(static_folder, exist_ok=True)
-            with open(os.path.join(static_folder, filename), "wb") as sf:
-                sf.write(image_data)
+            ruta_fija = os.path.join(folder, f"justif_{id_usuario}.jpg")
+            if filepath != ruta_fija:
+                shutil.copyfile(filepath, ruta_fija)
         except Exception:
             pass
 
-        # Retorna la ruta relativa corta para guardar en varchar(255)
-        return f"uploads/justificaciones/{filename}"
+        # Retorna la ruta corta para guardar en varchar(255)
+        return f"uploads/justificaciones/{nombre_archivo}"
     except Exception as e:
         print(f"[ERROR AL GUARDAR FOTO SUSTENTO]: {str(e)}")
         return None

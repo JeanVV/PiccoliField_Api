@@ -1,6 +1,9 @@
-from flask import Blueprint, request, jsonify
+import os
+import time
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required
 
+from config import BASE_DIR
 from services.asistencia_service import AsistenciaService
 from utils.response import error_response, success_response
 
@@ -83,12 +86,29 @@ def marcar_asistencia():
 @jwt_required(optional=True)
 def registrar_justificacion():
     operation_id = request.headers.get("X-Operation-Id") or request.headers.get("x-operation-id")
-    data = request.get_json() or {}
+    
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form.to_dict() if request.form else (request.get_json(silent=True) or {})
+
     id_usuario = data.get("idUsuario")
     motivo = data.get("motivo")
     descripcion = data.get("descripcion") or data.get("detalle")
     fecha = data.get("fecha")
-    ruta_sustento = data.get("fotoSustentoBase64") or data.get("ruta_sustento") or data.get("fotoSustento")
+    ruta_sustento = data.get("fotoSustentoBase64") or data.get("ruta_sustento") or data.get("fotoSustento") or data.get("foto")
+
+    # Si se envió la foto como archivo Multipart
+    if request.files:
+        foto_file = request.files.get("foto") or request.files.get("fotoSustento") or request.files.get("imagen")
+        if foto_file and foto_file.filename:
+            folder = os.path.join(BASE_DIR, "uploads", "justificaciones")
+            os.makedirs(folder, exist_ok=True)
+            ts = int(time.time())
+            nombre_archivo = f"justif_{id_usuario}_{ts}.jpg"
+            ruta_fisica = os.path.join(folder, nombre_archivo)
+            foto_file.save(ruta_fisica)
+            ruta_sustento = f"uploads/justificaciones/{nombre_archivo}"
 
     resultado, message, http_code = asistencia_service.registrar_justificacion(
         payload_or_id_usuario=id_usuario,

@@ -176,8 +176,9 @@ class UsuarioService:
             nuevo_valor = repository.actualizar_foto(id_usuario, ruta_bd)
             return {
                 "idUsuario": int(id_usuario),
-                "url_foto": nuevo_valor
-            }, "Foto guardada físicamente en el servidor", 200
+                "url_foto": nuevo_valor,
+                "fotoPerfil": nuevo_valor
+            }, "Foto guardada correctamente", 200
         except Exception as e:
             print(f"Error al actualizar foto de usuario {id_usuario}: {e}")
             return None, f"Error interno al guardar la foto: {str(e)}", 500

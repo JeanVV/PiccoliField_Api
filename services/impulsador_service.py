@@ -301,30 +301,40 @@ class ImpulsadorService:
             ruta_relativa = None
             hash_sha = None
 
-            # Manejo de fotografía (sea archivo Multipart o string Base64)
-            evidencias_dir = getattr(Config, "EVIDENCIAS_DIR", os.path.join(BASE_DIR, "uploads", "evidencias"))
-            os.makedirs(evidencias_dir, exist_ok=True)
+            carpeta_destino = os.path.join(BASE_DIR, "uploads", "evidencias")
+            os.makedirs(carpeta_destino, exist_ok=True)
 
-            contenido_bytes = None
-            nombre_archivo = f"incidencia_u{idUsuario}_{int(time.time())}.jpg"
+            nombre_archivo = f"incidencia_{idUsuario}_{int(time.time())}.jpg"
+            ruta_fisica = os.path.join(carpeta_destino, nombre_archivo)
 
-            if archivo_foto and hasattr(archivo_foto, "read"):
-                contenido_bytes = archivo_foto.read()
-            elif foto_base64 and isinstance(foto_base64, str):
+            # 1. Si la foto vino como archivo físico (Multipart)
+            if archivo_foto and getattr(archivo_foto, "filename", ""):
                 try:
-                    # Remover prefijo data:image/...;base64, si existe
-                    if "base64," in foto_base64:
-                        foto_base64 = foto_base64.split("base64,")[1]
-                    contenido_bytes = base64.b64decode(foto_base64)
+                    archivo_foto.save(ruta_fisica)
+                    with open(ruta_fisica, "rb") as rf:
+                        hash_sha = hashlib.sha256(rf.read()).hexdigest()
+                    ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
                 except Exception as ex:
-                    print(f"Error al decodificar base64: {ex}")
+                    print(f"[WARN] Error al guardar archivo multipart incidencia: {ex}")
+            # 2. Si la foto vino como Base64 (foto_base64, url_foto, foto o imagen)
+            else:
+                foto_b64 = payload.get("foto_base64") or payload.get("url_foto") or payload.get("foto") or payload.get("imagen")
+                if foto_b64 and isinstance(foto_b64, str):
+                    try:
+                        if "base64," in foto_b64:
+                            header, encoded_data = foto_b64.split("base64,", 1)
+                        elif "," in foto_b64 and len(foto_b64) > 100:
+                            header, encoded_data = foto_b64.split(",", 1)
+                        else:
+                            encoded_data = foto_b64
 
-            if contenido_bytes:
-                hash_sha = hashlib.sha256(contenido_bytes).hexdigest()
-                ruta_fisica = os.path.join(evidencias_dir, nombre_archivo)
-                with open(ruta_fisica, "wb") as f:
-                    f.write(contenido_bytes)
-                ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
+                        image_data = base64.b64decode(encoded_data)
+                        with open(ruta_fisica, "wb") as f:
+                            f.write(image_data)
+                        hash_sha = hashlib.sha256(image_data).hexdigest()
+                        ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
+                    except Exception as ex:
+                        print(f"[WARN] Error al decodificar y guardar base64 incidencia: {ex}")
 
             resultado, mensaje, http_code = repo.registrar_incidencia(
                 idUsuario=idUsuario,
@@ -454,28 +464,38 @@ class ImpulsadorService:
             ruta_relativa = None
             hash_sha = None
 
-            evidencias_dir = getattr(Config, "EVIDENCIAS_DIR", os.path.join(BASE_DIR, "uploads", "evidencias"))
-            os.makedirs(evidencias_dir, exist_ok=True)
+            carpeta_destino = os.path.join(BASE_DIR, "uploads", "evidencias")
+            os.makedirs(carpeta_destino, exist_ok=True)
 
-            contenido_bytes = None
-            nombre_archivo = f"reposicion_u{idUsuario}_{int(time.time())}.jpg"
+            nombre_archivo = f"reposicion_{idUsuario}_{int(time.time())}.jpg"
+            ruta_fisica = os.path.join(carpeta_destino, nombre_archivo)
 
-            if archivo_foto and hasattr(archivo_foto, "read"):
-                contenido_bytes = archivo_foto.read()
-            elif foto_base64 and isinstance(foto_base64, str):
+            if archivo_foto and getattr(archivo_foto, "filename", ""):
                 try:
-                    if "base64," in foto_base64:
-                        foto_base64 = foto_base64.split("base64,")[1]
-                    contenido_bytes = base64.b64decode(foto_base64)
+                    archivo_foto.save(ruta_fisica)
+                    with open(ruta_fisica, "rb") as rf:
+                        hash_sha = hashlib.sha256(rf.read()).hexdigest()
+                    ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
                 except Exception as ex:
-                    print(f"Error al decodificar base64: {ex}")
+                    print(f"[WARN] Error al guardar archivo multipart reposicion: {ex}")
+            else:
+                foto_b64 = payload.get("foto_base64") or payload.get("url_foto") or payload.get("foto") or payload.get("imagen")
+                if foto_b64 and isinstance(foto_b64, str):
+                    try:
+                        if "base64," in foto_b64:
+                            header, encoded_data = foto_b64.split("base64,", 1)
+                        elif "," in foto_b64 and len(foto_b64) > 100:
+                            header, encoded_data = foto_b64.split(",", 1)
+                        else:
+                            encoded_data = foto_b64
 
-            if contenido_bytes:
-                hash_sha = hashlib.sha256(contenido_bytes).hexdigest()
-                ruta_fisica = os.path.join(evidencias_dir, nombre_archivo)
-                with open(ruta_fisica, "wb") as f:
-                    f.write(contenido_bytes)
-                ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
+                        image_data = base64.b64decode(encoded_data)
+                        with open(ruta_fisica, "wb") as f:
+                            f.write(image_data)
+                        hash_sha = hashlib.sha256(image_data).hexdigest()
+                        ruta_relativa = f"uploads/evidencias/{nombre_archivo}"
+                    except Exception as ex:
+                        print(f"[WARN] Error al decodificar base64 reposicion: {ex}")
 
             resultado, mensaje, http_code = repo.reponer_stock(
                 idUsuario=idUsuario,

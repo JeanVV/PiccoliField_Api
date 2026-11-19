@@ -293,6 +293,8 @@ class AsistenciaRepository:
                 "idAsistencias": id_asistencia,
                 "idUsuario": id_user,
                 "estado": "PENDIENTE",
+                "ruta_sustento": ruta_final,
+                "fotoSustento": ruta_final,
                 "mensaje": "Justificación registrada exitosamente",
                 "message": "Justificación registrada exitosamente"
             }

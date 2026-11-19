@@ -1,9 +1,59 @@
 import os
+import time
+import base64
 import traceback
 from config import BASE_DIR
 from database import get_connection
 from repositories.prospecto_repository import ProspectoRepository
 from repositories.usuario_repository import UsuarioRepository
+
+
+def guardar_foto_prospecto(raw_foto, id_prospecto=None):
+    """
+    Decodifica Base64 de fachada de prospecto y guarda el archivo físico en uploads/evidencias/.
+    Retorna la ruta corta para guardar en MySQL: 'uploads/evidencias/prospecto_fachada_...jpg'.
+    """
+    if not raw_foto:
+        return None
+    foto_b64 = str(raw_foto).strip()
+    if len(foto_b64) < 100 and (foto_b64.startswith("uploads/") or foto_b64.startswith("http")):
+        return foto_b64  # Ya es una ruta física existente
+
+    ruta_bd = None
+    try:
+        if "base64," in foto_b64:
+            header, encoded_data = foto_b64.split("base64,", 1)
+        elif "," in foto_b64 and len(foto_b64) > 100:
+            header, encoded_data = foto_b64.split(",", 1)
+        else:
+            encoded_data = foto_b64
+
+        image_data = base64.b64decode(encoded_data)
+        carpeta_destino = os.path.join(BASE_DIR, "uploads", "evidencias")
+        os.makedirs(carpeta_destino, exist_ok=True)
+
+        ts = int(time.time())
+        nombre_archivo = f"prospecto_fachada_{ts}.jpg" if not id_prospecto else f"prospecto_{id_prospecto}_{ts}.jpg"
+        ruta_fisica = os.path.join(carpeta_destino, nombre_archivo)
+
+        with open(ruta_fisica, "wb") as f:
+            f.write(image_data)
+
+        ruta_bd = f"uploads/evidencias/{nombre_archivo}"
+
+        # Copia de compatibilidad en uploads/prospectos/
+        try:
+            carpeta_prosp = os.path.join(BASE_DIR, "uploads", "prospectos")
+            os.makedirs(carpeta_prosp, exist_ok=True)
+            with open(os.path.join(carpeta_prosp, nombre_archivo), "wb") as pf:
+                pf.write(image_data)
+        except Exception:
+            pass
+
+    except Exception as e:
+        print("Error guardando foto de prospecto:", e)
+
+    return ruta_bd
 
 
 def normalizar_estado_prospecto(estado_str):
@@ -144,6 +194,13 @@ class ProspectoService:
             estado_raw = payload.get("estado", "NUEVO")
             estado_inicial = normalizar_estado_prospecto(estado_raw) or "NUEVO"
 
+            # Procesar foto de fachada si viene en Base64 o Multipart
+            url_foto_final = payload.get("url_foto") or payload.get("fotoUrl") or payload.get("foto") or payload.get("foto_fachada") or payload.get("foto_base64")
+            if url_foto_final:
+                foto_guardada = guardar_foto_prospecto(url_foto_final)
+                if foto_guardada:
+                    url_foto_final = foto_guardada
+
             data_insert = {
                 "nombre_comercial": str(nombre_comercial).strip(),
                 "tipo_local": payload.get("tipo_local") or payload.get("tipo"),
@@ -154,7 +211,7 @@ class ProspectoService:
                 "estado": estado_inicial,
                 "notas": payload.get("notas"),
                 "motivo_descarte": payload.get("motivo_descarte"),
-                "url_foto": payload.get("url_foto") or payload.get("foto"),
+                "url_foto": url_foto_final,
                 "latitud": latitud,
                 "longitud": longitud,
                 "idDistrito": idDistrito,
@@ -192,6 +249,13 @@ class ProspectoService:
             prospecto = repo.buscar_por_id(idProspectos)
             if not prospecto:
                 return None, "Prospecto no encontrado", 404
+
+            # Procesar foto de fachada si viene en Base64 o Multipart
+            url_foto_upd = payload.get("url_foto") or payload.get("fotoUrl") or payload.get("foto") or payload.get("foto_fachada") or payload.get("foto_base64")
+            if url_foto_upd:
+                foto_guardada = guardar_foto_prospecto(url_foto_upd, idProspectos)
+                if foto_guardada:
+                    payload["url_foto"] = foto_guardada
 
             # Si viene cambio de estado dentro del payload general, normalizarlo
             if "estado" in payload and payload["estado"]:
