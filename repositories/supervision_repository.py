@@ -10,17 +10,30 @@ class SupervisionRepository:
                     u.idUsuario,
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
                     u.url_foto,
-                    COALESCE(h_pv.puntoVenta, pdv.puntoVenta, 'Sin local asignado') AS local, 
-                    SUM(dv.cantidad) AS cantidadVendida,
-                    u.meta_ventas AS meta_asignada
+                    COALESCE(
+                        (SELECT h_pv.puntoVenta 
+                         FROM HISTORIAL_ASIGNACIONES h 
+                         INNER JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta 
+                         WHERE h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL 
+                         ORDER BY h.fecha_inicio DESC, h.idHistorial DESC LIMIT 1),
+                        (SELECT pdv.puntoVenta 
+                         FROM PUNTOS_VENTA pdv 
+                         WHERE pdv.idUsuario = u.idUsuario AND pdv.estado = 'ACTIVO' AND pdv.tipo = 'VENTA' 
+                         ORDER BY pdv.idPuntosVenta DESC LIMIT 1),
+                        'Sin local asignado'
+                    ) AS local,
+                    COALESCE(v_agg.cantidadVendida, 0) AS cantidadVendida,
+                    COALESCE(u.meta_ventas, 0) AS meta_asignada
                 FROM USUARIOS u
-                INNER JOIN VENTAS v ON u.idUsuario = v.idUsuario
-                INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
-                LEFT JOIN HISTORIAL_ASIGNACIONES h ON h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL
-                LEFT JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta
-                LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario AND pdv.tipo = 'VENTA'
+                INNER JOIN (
+                    SELECT 
+                        v.idUsuario,
+                        SUM(dv.cantidad) AS cantidadVendida
+                    FROM VENTAS v
+                    INNER JOIN DETALLE_VENTA dv ON v.idVenta = dv.idVenta
+                    GROUP BY v.idUsuario
+                ) v_agg ON u.idUsuario = v_agg.idUsuario
                 WHERE u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
-                GROUP BY u.idUsuario, u.nombres, u.apePaterno, u.url_foto, h_pv.puntoVenta, pdv.puntoVenta, u.meta_ventas
                 ORDER BY cantidadVendida DESC;
             """
             cursor.execute(sql)
@@ -73,17 +86,36 @@ class SupervisionRepository:
                     u.idUsuario,
                     CONCAT(u.nombres, ' ', u.apePaterno) AS nombre,
                     u.url_foto,
-                    COALESCE(h_pv.idPuntosVenta, pdv.idPuntosVenta) AS idPuntosVenta,
-                    COALESCE(h_pv.puntoVenta, pdv.puntoVenta, 'Sin local asignado') AS local_pertenece,
-                    u.meta_ventas AS meta_asignada,
-                    COALESCE(SUM(v.total), 0) AS monto_vendido
+                    COALESCE(
+                        (SELECT h.idPuntosVenta 
+                         FROM HISTORIAL_ASIGNACIONES h 
+                         WHERE h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL 
+                         ORDER BY h.fecha_inicio DESC, h.idHistorial DESC LIMIT 1),
+                        (SELECT pdv.idPuntosVenta 
+                         FROM PUNTOS_VENTA pdv 
+                         WHERE pdv.idUsuario = u.idUsuario AND pdv.estado = 'ACTIVO' AND pdv.tipo = 'VENTA' 
+                         ORDER BY pdv.idPuntosVenta DESC LIMIT 1)
+                    ) AS idPuntosVenta,
+                    COALESCE(
+                        (SELECT h_pv.puntoVenta 
+                         FROM HISTORIAL_ASIGNACIONES h 
+                         INNER JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta 
+                         WHERE h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL 
+                         ORDER BY h.fecha_inicio DESC, h.idHistorial DESC LIMIT 1),
+                        (SELECT pdv.puntoVenta 
+                         FROM PUNTOS_VENTA pdv 
+                         WHERE pdv.idUsuario = u.idUsuario AND pdv.estado = 'ACTIVO' AND pdv.tipo = 'VENTA' 
+                         ORDER BY pdv.idPuntosVenta DESC LIMIT 1),
+                        'Sin local asignado'
+                    ) AS local_pertenece,
+                    COALESCE(u.meta_ventas, 0) AS meta_asignada,
+                    COALESCE(
+                        (SELECT SUM(v.total) FROM VENTAS v WHERE v.idUsuario = u.idUsuario), 
+                        0
+                    ) AS monto_vendido
                 FROM USUARIOS u
-                LEFT JOIN HISTORIAL_ASIGNACIONES h ON h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL
-                LEFT JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta
-                LEFT JOIN PUNTOS_VENTA pdv ON u.idUsuario = pdv.idUsuario AND pdv.tipo = 'VENTA'
-                LEFT JOIN VENTAS v ON u.idUsuario = v.idUsuario
                 WHERE u.idUsuario = %s AND u.rol IN ('PROMOTOR', 'IMPULSADOR', 'VENDEDOR')
-                GROUP BY u.idUsuario, u.nombres, u.apePaterno, u.url_foto, h_pv.idPuntosVenta, pdv.idPuntosVenta, h_pv.puntoVenta, pdv.puntoVenta, u.meta_ventas
+                LIMIT 1;
             """
             cursor.execute(sql_info, (idUsuario,))
             vendedor = cursor.fetchone()
@@ -516,13 +548,30 @@ class SupervisionRepository:
                     u.correo,
                     u.rol,
                     u.url_foto,
-                    u.meta_ventas,
-                    COALESCE(h_pv.idPuntosVenta, pv.idPuntosVenta) AS idPuntosVenta,
-                    COALESCE(h_pv.puntoVenta, pv.puntoVenta, 'Sin local asignado') AS local_actual
+                    COALESCE(u.meta_ventas, 0) AS meta_ventas,
+                    COALESCE(
+                        (SELECT h.idPuntosVenta 
+                         FROM HISTORIAL_ASIGNACIONES h 
+                         WHERE h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL 
+                         ORDER BY h.fecha_inicio DESC, h.idHistorial DESC LIMIT 1),
+                        (SELECT pv.idPuntosVenta 
+                         FROM PUNTOS_VENTA pv 
+                         WHERE pv.idUsuario = u.idUsuario AND pv.estado = 'ACTIVO' AND pv.tipo = 'VENTA' 
+                         ORDER BY pv.idPuntosVenta DESC LIMIT 1)
+                    ) AS idPuntosVenta,
+                    COALESCE(
+                        (SELECT h_pv.puntoVenta 
+                         FROM HISTORIAL_ASIGNACIONES h 
+                         INNER JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta 
+                         WHERE h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL 
+                         ORDER BY h.fecha_inicio DESC, h.idHistorial DESC LIMIT 1),
+                        (SELECT pv.puntoVenta 
+                         FROM PUNTOS_VENTA pv 
+                         WHERE pv.idUsuario = u.idUsuario AND pv.estado = 'ACTIVO' AND pv.tipo = 'VENTA' 
+                         ORDER BY pv.idPuntosVenta DESC LIMIT 1),
+                        'Sin local asignado'
+                    ) AS local_actual
                 FROM USUARIOS u
-                LEFT JOIN HISTORIAL_ASIGNACIONES h ON h.idUsuario = u.idUsuario AND h.fecha_fin IS NULL
-                LEFT JOIN PUNTOS_VENTA h_pv ON h.idPuntosVenta = h_pv.idPuntosVenta
-                LEFT JOIN PUNTOS_VENTA pv ON u.idUsuario = pv.idUsuario AND pv.tipo = 'VENTA'
                 WHERE u.rol IN ('IMPULSADOR', 'PROMOTOR') AND u.estado = 'ACTIVO'
                 ORDER BY u.nombres ASC, u.apePaterno ASC
             """
