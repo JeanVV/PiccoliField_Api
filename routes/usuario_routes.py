@@ -68,8 +68,8 @@ def listar_notificaciones():
 def actualizar_foto_usuario(id_usuario):
     try:
         data = request.get_json(silent=True) or {}
-        url_foto = data.get("url_foto") or data.get("foto")
-        archivo = request.files.get("foto")
+        url_foto = data.get("foto") or data.get("url_foto") or data.get("foto_base64")
+        archivo = request.files.get("foto") or request.files.get("imagen") or request.files.get("file")
 
         resultado, message, code = service.actualizar_foto_usuario(
             id_usuario=id_usuario,
@@ -99,8 +99,8 @@ def actualizar_foto_mi_perfil():
         id_usuario = identidad.get("idUsuario") if isinstance(identidad, dict) else int(identidad)
 
         data = request.get_json(silent=True) or {}
-        url_foto = data.get("url_foto") or data.get("foto")
-        archivo = request.files.get("foto")
+        url_foto = data.get("foto") or data.get("url_foto") or data.get("foto_base64")
+        archivo = request.files.get("foto") or request.files.get("imagen") or request.files.get("file")
 
         resultado, message, code = service.actualizar_foto_usuario(
             id_usuario=id_usuario,
