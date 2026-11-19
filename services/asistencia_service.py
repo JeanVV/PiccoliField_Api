@@ -6,7 +6,7 @@ import threading
 from datetime import datetime
 from config import BASE_DIR, Config
 from database import get_connection
-from repositories.asistencia_repository import AsistenciaRepository, get_now_peru
+from repositories.asistencia_repository import AsistenciaRepository, get_now_peru, calcular_estado_asistencia
 from services.fcm_service import FCMService
 
 _idempotency_cache = {}
@@ -137,11 +137,27 @@ class AsistenciaService:
             longitud = payload.get("longitud")
             direccion = payload.get("direccion") or payload.get("ubicacion")
             sede = payload.get("sede") or payload.get("nombreSede")
-            fecha_hora_disp = payload.get("fechaHoraDispositivo") or payload.get("fecha_hora_disp")
+            fecha_hora_disp = (
+                payload.get("fechaHoraDispositivo")
+                or payload.get("fecha_hora_disp")
+                or payload.get("hora_dispositivo")
+                or payload.get("horaDispositivo")
+                or payload.get("fechaHora")
+                or payload.get("hora")
+            )
             if not op_id:
                 op_id = payload.get("operationId") or payload.get("x_operation_id") or payload.get("X-Operation-Id")
         else:
             id_usuario = payload_or_id_usuario
+            fecha_hora_disp = (
+                fecha_hora_disp
+                or kwargs.get("fecha_hora_disp")
+                or kwargs.get("fechaHoraDispositivo")
+                or kwargs.get("hora_dispositivo")
+                or kwargs.get("horaDispositivo")
+                or kwargs.get("fechaHora")
+                or kwargs.get("hora")
+            )
 
         # 1. Validar Idempotencia con X-Operation-Id
         if op_id:

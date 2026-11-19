@@ -9,6 +9,73 @@ except ImportError:
 def get_now_peru():
     return datetime.now(peru_tz)
 
+
+def calcular_estado_asistencia(tipo, fecha_hora_disp=None):
+    """
+    Regla de Negocio para INGRESO:
+    1. Extrae la hora de marcación (hora_dispositivo u hora_servidor).
+    2. Si la hora es <= 09:40:00 AM:
+       - estado = 'A_TIEMPO'
+       - minutos_tardanza = 0
+    3. Si la hora es > 09:40:00 AM:
+       - estado = 'TARDANZA'
+       - minutos_tardanza = (hora_marcado - 09:00:00 AM) en minutos.
+    Para SALIDA u otros tipos:
+       - estado = 'A_TIEMPO'
+       - minutos_tardanza = 0
+    """
+    tipo_upper = str(tipo).upper().strip() if tipo else "INGRESO"
+    if tipo_upper != "INGRESO":
+        return "A_TIEMPO", 0, get_now_peru()
+
+    # 1. Extrae la hora de marcación (hora_dispositivo u hora_servidor)
+    hora_marcacion = None
+    if isinstance(fecha_hora_disp, datetime):
+        hora_marcacion = fecha_hora_disp
+    elif fecha_hora_disp:
+        raw = str(fecha_hora_disp).strip()
+        raw_clean = raw.replace("Z", "").replace("z", "").split("+")[0].split(".")[0]
+        formatos = [
+            "%Y-%m-%dT%H:%M:%S",
+            "%Y-%m-%d %H:%M:%S",
+            "%Y/%m/%d %H:%M:%S",
+            "%d/%m/%Y %H:%M:%S",
+            "%d-%m-%Y %H:%M:%S",
+            "%H:%M:%S",
+            "%H:%M"
+        ]
+        for fmt in formatos:
+            try:
+                dt = datetime.strptime(raw_clean, fmt)
+                if fmt in ("%H:%M:%S", "%H:%M"):
+                    now_p = get_now_peru()
+                    hora_marcacion = now_p.replace(hour=dt.hour, minute=dt.minute, second=dt.second, microsecond=0)
+                else:
+                    hora_marcacion = dt
+                break
+            except ValueError:
+                continue
+
+    if not hora_marcacion:
+        hora_marcacion = get_now_peru()
+
+    # Cálculo en segundos transcurridos en el día: HH * 3600 + MM * 60 + SS
+    segundos_marcacion = hora_marcacion.hour * 3600 + hora_marcacion.minute * 60 + hora_marcacion.second
+    segundos_limite = 9 * 3600 + 40 * 60    # 09:40:00 AM = 34800 segundos
+    segundos_base = 9 * 3600               # 09:00:00 AM = 32400 segundos
+
+    # 2. Si la hora es <= 09:40:00 AM
+    if segundos_marcacion <= segundos_limite:
+        estado = "A_TIEMPO"
+        minutos_tardanza = 0
+    # 3. Si la hora es > 09:40:00 AM
+    else:
+        estado = "TARDANZA"
+        diferencia_segundos = segundos_marcacion - segundos_base
+        minutos_tardanza = max(0, int(diferencia_segundos // 60))
+
+    return estado, minutos_tardanza, hora_marcacion
+
 class AsistenciaRepository:
     def __init__(self, connection):
         self.connection = connection
@@ -153,7 +220,7 @@ class AsistenciaRepository:
             # 2. Control de duplicados el mismo día para INGRESO
             if tipo_upper == 'INGRESO':
                 sql_check = """
-                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_servidor, '%%H:%%i:%%s') AS hora, estado
+                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_servidor, '%%H:%%i:%%s') AS hora, estado, minutos_tardanza
                     FROM ASISTENCIAS
                     WHERE idUsuario = %s AND tipo = 'INGRESO' AND DATE(fecha_hora_servidor) = CURDATE()
                     LIMIT 1
@@ -165,22 +232,38 @@ class AsistenciaRepository:
                         id_asist = existente.get('idAsistencias')
                         hora_str = existente.get('hora') or ""
                         est_str = existente.get('estado') or 'A_TIEMPO'
+                        min_tard = existente.get('minutos_tardanza') or 0
                     else:
                         id_asist = existente[0]
                         hora_str = str(existente[1]) if len(existente) > 1 and existente[1] else ""
                         est_str = str(existente[2]) if len(existente) > 2 and existente[2] else 'A_TIEMPO'
+                        min_tard = int(existente[3]) if len(existente) > 3 and existente[3] is not None else 0
 
                     return {
                         "idAsistencias": id_asist,
                         "tipo": "INGRESO",
                         "estado": est_str,
-                        "minutosTardanza": 0,
+                        "minutosTardanza": min_tard,
                         "yaRegistrado": True,
                         "mensaje": f"Ya has registrado tu ingreso hoy a las {hora_str}",
                         "message": f"Ya has registrado tu ingreso hoy a las {hora_str}"
                     }
 
-            # 3. INSERT a la tabla ASISTENCIAS
+            # 3. Cálculo de estado y minutos de tardanza (Regla de Negocio)
+            disp_param = (
+                fecha_hora_disp
+                or kwargs.get("hora_dispositivo")
+                or kwargs.get("fechaHoraDispositivo")
+                or kwargs.get("horaDispositivo")
+                or kwargs.get("fechaHora")
+            )
+            estado, minutos_tardanza, dt_marcacion = calcular_estado_asistencia(tipo_upper, disp_param)
+
+            # Formateo de fechas para MySQL
+            fecha_servidor_str = get_now_peru().strftime("%Y-%m-%d %H:%M:%S")
+            fecha_disp_str = dt_marcacion.strftime("%Y-%m-%d %H:%M:%S")
+
+            # 4. INSERT a la tabla ASISTENCIAS
             try:
                 lat_val = float(latitud) if latitud is not None and str(latitud).strip() not in ("", "null", "None") else -6.7711982
             except (ValueError, TypeError):
@@ -199,20 +282,30 @@ class AsistenciaRepository:
                     minutos_tardanza, latitud, longitud, radio, precision_m,
                     marcacion_observada, observacion, idUsuario
                 ) VALUES (
-                    %s, NOW(), NOW(), 'A_TIEMPO',
-                    0, %s, %s, 100.0, 5.0,
+                    %s, %s, %s, %s,
+                    %s, %s, %s, 100.0, 5.0,
                     0, %s, %s
                 )
             """
-            cursor.execute(sql, (tipo_upper, lat_val, lng_val, obs, id_user))
+            cursor.execute(sql, (
+                tipo_upper,
+                fecha_servidor_str,
+                fecha_disp_str,
+                estado,
+                minutos_tardanza,
+                lat_val,
+                lng_val,
+                obs,
+                id_user
+            ))
             self.connection.commit()
 
             id_nuevo = cursor.lastrowid
             return {
                 "idAsistencias": id_nuevo,
                 "tipo": tipo_upper,
-                "estado": "A_TIEMPO",
-                "minutosTardanza": 0,
+                "estado": estado,
+                "minutosTardanza": minutos_tardanza,
                 "yaRegistrado": False,
                 "mensaje": "Asistencia registrada correctamente",
                 "message": "Asistencia registrada correctamente"
