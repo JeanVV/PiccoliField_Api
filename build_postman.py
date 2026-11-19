@@ -224,6 +224,21 @@ def build_collection():
                 method="GET",
                 url="{{base_url}}/puntos-venta/20/historial",
                 desc="Lista el histórico de todos los promotores/vendedores que han sido asignados al punto de venta."
+            ),
+            req(
+                name="Actualizar Foto de Punto de Venta (Base64 o Multipart)",
+                method="PUT",
+                url="{{base_url}}/puntos-venta/20/foto",
+                desc="Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la base de datos.",
+                body={
+                    "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+                }
+            ),
+            req(
+                name="Obtener Foto de Punto de Venta (Stream)",
+                method="GET",
+                url="{{base_url}}/puntos-venta/20/foto",
+                desc="Retorna en streaming binario la imagen del punto de venta o del prospecto del que fue convertido."
             )
         ]
     }
@@ -850,6 +865,21 @@ def build_collection():
                 method="GET",
                 url="{{base_url}}/prospectos/1/seguimientos",
                 desc="Obtiene la cronología completa de visitas, llamadas y acuerdos realizados con el prospecto."
+            ),
+            req(
+                name="Actualizar Foto de Prospecto (Base64 o Multipart)",
+                method="PUT",
+                url="{{base_url}}/prospectos/1/foto",
+                desc="Guarda la fotografía de fachada del prospecto en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la base de datos.",
+                body={
+                    "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+                }
+            ),
+            req(
+                name="Obtener Foto de Prospecto (Stream)",
+                method="GET",
+                url="{{base_url}}/prospectos/1/foto",
+                desc="Retorna en streaming binario la imagen registrada del prospecto."
             )
         ]
     }
@@ -884,10 +914,17 @@ def build_collection():
         "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas.",
         "item": [
             req(
-                name="Servir Archivo / Foto Subida",
+                name="Servir Archivo / Foto Subida (Prefijo /api/uploads)",
+                method="GET",
+                url="{{base_url}}/uploads/prospectos/prospecto_1.jpg",
+                desc="Sirve directamente cualquier archivo en uploads/ a través de la ruta estándar /api/uploads/<carpeta>/<archivo>.",
+                auth_inherit=False
+            ),
+            req(
+                name="Servir Archivo / Foto Subida (Ruta Raíz /uploads)",
                 method="GET",
                 url="{{base_host}}/uploads/perfiles/user_8.jpg",
-                desc="Sirve directamente el archivo físico alojado en la carpeta uploads/ (fotos de perfil, incidencias, prospectos).",
+                desc="Sirve directamente el archivo físico alojado en la carpeta uploads/ desde la raíz del dominio.",
                 auth_inherit=False
             )
         ]

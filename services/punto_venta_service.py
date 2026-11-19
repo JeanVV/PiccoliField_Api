@@ -1,6 +1,40 @@
+import os
+from config import BASE_DIR
 from database import get_connection
 from repositories.punto_venta_repository import PuntoVentaRepository
 from repositories.usuario_repository import UsuarioRepository
+
+
+def _resolver_foto_pdv(punto):
+    """
+    Asigna url_foto si existe el archivo físico en uploads/prospectos/
+    o si proviene de un prospecto convertido (DIST-xxxx).
+    """
+    if not isinstance(punto, dict):
+        return punto
+
+    if punto.get("url_foto"):
+        return punto
+
+    id_pdv = punto.get("idPuntosVenta")
+    if id_pdv:
+        pdv_path = f"uploads/prospectos/pdv_{id_pdv}.jpg"
+        if os.path.isfile(os.path.join(BASE_DIR, pdv_path)):
+            punto["url_foto"] = pdv_path
+            return punto
+
+    codigo = str(punto.get("codigo", ""))
+    if codigo.startswith("DIST-"):
+        try:
+            id_prosp = int(codigo.replace("DIST-", ""))
+            prosp_path = f"uploads/prospectos/prospecto_{id_prosp}.jpg"
+            if os.path.isfile(os.path.join(BASE_DIR, prosp_path)):
+                punto["url_foto"] = prosp_path
+                return punto
+        except Exception:
+            pass
+
+    return punto
 
 
 class PuntoVentaService:
@@ -16,6 +50,8 @@ class PuntoVentaService:
                 tipo=tipo,
                 idUsuario=idUsuario
             )
+            for p in puntos:
+                _resolver_foto_pdv(p)
             return puntos, "Puntos de venta obtenidos correctamente", 200
         finally:
             connection.close()
@@ -27,6 +63,7 @@ class PuntoVentaService:
             punto = repo.buscar_por_id(idPuntosVenta)
             if not punto:
                 return None, "Punto de venta no encontrado", 404
+            _resolver_foto_pdv(punto)
             return punto, "Punto de venta obtenido correctamente", 200
         finally:
             connection.close()

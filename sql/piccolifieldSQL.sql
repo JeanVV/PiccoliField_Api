@@ -91,6 +91,7 @@ CREATE TABLE PUNTOS_VENTA (
     longitud DECIMAL(11, 8) NOT NULL,
     radio_geocerca DECIMAL(6, 2) NOT NULL DEFAULT 50.00,
     tipo ENUM('VENTA', 'DISTRIBUCIÓN') NOT NULL,
+    url_foto VARCHAR(255) NULL,
     idDistrito INT NOT NULL,
     idUsuario INT NULL,
     FOREIGN KEY (idDistrito) REFERENCES DISTRITO(idDistrito),

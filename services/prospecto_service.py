@@ -1,4 +1,6 @@
+import os
 import traceback
+from config import BASE_DIR
 from database import get_connection
 from repositories.prospecto_repository import ProspectoRepository
 from repositories.usuario_repository import UsuarioRepository
@@ -47,10 +49,14 @@ class ProspectoService:
                 search=search
             )
 
-            # Enriquecer cada prospecto con alias útiles (id, nombre, estado_label)
+            # Enriquecer cada prospecto con alias útiles (id, nombre, estado_label, url_foto)
             for p in (prospectos or []):
                 p["id"] = p.get("idProspectos")
                 p["nombre"] = p.get("nombre_comercial")
+                if not p.get("url_foto"):
+                    disk_rel = f"uploads/prospectos/prospecto_{p.get('idProspectos')}.jpg"
+                    if os.path.isfile(os.path.join(BASE_DIR, disk_rel)):
+                        p["url_foto"] = disk_rel
                 est = str(p.get("estado", "")).upper()
                 if est == "EN_NEGOCIACION":
                     p["estado_label"] = "En Negociación"
@@ -81,6 +87,10 @@ class ProspectoService:
             prospecto["seguimientos"] = seguimientos
             prospecto["id"] = prospecto.get("idProspectos")
             prospecto["nombre"] = prospecto.get("nombre_comercial")
+            if not prospecto.get("url_foto"):
+                disk_rel = f"uploads/prospectos/prospecto_{prospecto.get('idProspectos')}.jpg"
+                if os.path.isfile(os.path.join(BASE_DIR, disk_rel)):
+                    prospecto["url_foto"] = disk_rel
 
             est = str(prospecto.get("estado", "")).upper()
             if est == "EN_NEGOCIACION":

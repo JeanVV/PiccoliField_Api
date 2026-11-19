@@ -255,6 +255,13 @@ class ProspectoRepository:
                         ))
                         id_nuevo_pdv = cursor.lastrowid
 
+                        # Si el prospecto tenía foto, vincularla al nuevo punto de venta
+                        if prospecto.get("url_foto"):
+                            try:
+                                cursor.execute("UPDATE PUNTOS_VENTA SET url_foto = %s WHERE idPuntosVenta = %s", (prospecto["url_foto"], id_nuevo_pdv))
+                            except Exception:
+                                pass
+
                         # Registrar en HISTORIAL_ASIGNACIONES si tiene promotor asignado
                         if prospecto["idUsuario"]:
                             sql_hist = """

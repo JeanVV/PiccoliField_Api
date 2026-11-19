@@ -34,6 +34,15 @@ def create_app():
     app.register_blueprint(producto_bp)
     app.register_blueprint(prospecto_bp)
 
+    # Asegurar existencia de carpetas en uploads/
+    import os
+    from flask import send_from_directory
+    from config import BASE_DIR
+
+    UPLOADS_ROOT = os.path.join(BASE_DIR, "uploads")
+    for sub in ["evidencias", "justificaciones", "perfiles", "productos", "prospectos", "puntos_venta"]:
+        os.makedirs(os.path.join(UPLOADS_ROOT, sub), exist_ok=True)
+
     @app.get("/")
     def inicio():
         return {
@@ -42,12 +51,35 @@ def create_app():
             "status": True,
         }, 200
 
-    @app.get("/uploads/<path:filename>")
+    @app.route("/uploads/<path:filename>", methods=["GET"])
+    @app.route("/api/uploads/<path:filename>", methods=["GET"])
     def servir_archivo(filename):
-        import os
-        from flask import send_from_directory
-        from config import BASE_DIR
-        return send_from_directory(os.path.join(BASE_DIR, "uploads"), filename)
+        # 1. Normalizar si el cliente envía 'uploads/' en la ruta solicitada
+        clean_name = filename.replace("\\", "/").strip("/")
+        if clean_name.lower().startswith("uploads/"):
+            clean_name = clean_name[len("uploads/"):].strip("/")
+
+        full_path = os.path.join(UPLOADS_ROOT, clean_name)
+
+        # 2. Si no existe exactamente, verificar extensiones de imagen (.jpg, .jpeg, .png, .webp)
+        if not os.path.isfile(full_path):
+            for ext in [".jpg", ".jpeg", ".png", ".webp", ".JPG", ".PNG"]:
+                if os.path.isfile(full_path + ext):
+                    clean_name = clean_name + ext
+                    full_path = full_path + ext
+                    break
+
+        if not os.path.isfile(full_path):
+            return {
+                "data": None,
+                "message": f"Archivo '{filename}' no encontrado en el servidor",
+                "status": False
+            }, 404
+
+        rel_dir = os.path.dirname(clean_name)
+        file_basename = os.path.basename(clean_name)
+        target_dir = os.path.join(UPLOADS_ROOT, rel_dir) if rel_dir else UPLOADS_ROOT
+        return send_from_directory(target_dir, file_basename)
 
     iniciar_scheduler(app)
 

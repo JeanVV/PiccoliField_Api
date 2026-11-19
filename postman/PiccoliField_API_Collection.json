@@ -422,6 +422,61 @@
             "description": "Lista el histórico de todos los promotores/vendedores que han sido asignados al punto de venta."
           },
           "response": []
+        },
+        {
+          "name": "Actualizar Foto de Punto de Venta (Base64 o Multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la base de datos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Foto de Punto de Venta (Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Retorna en streaming binario la imagen del punto de venta o del prospecto del que fue convertido."
+          },
+          "response": []
         }
       ]
     },
@@ -2248,6 +2303,61 @@
             "description": "Obtiene la cronología completa de visitas, llamadas y acuerdos realizados con el prospecto."
           },
           "response": []
+        },
+        {
+          "name": "Actualizar Foto de Prospecto (Base64 o Multipart)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Guarda la fotografía de fachada del prospecto en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la base de datos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Foto de Prospecto (Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Retorna en streaming binario la imagen registrada del prospecto."
+          },
+          "response": []
         }
       ]
     },
@@ -2295,7 +2405,30 @@
       "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas.",
       "item": [
         {
-          "name": "Servir Archivo / Foto Subida",
+          "name": "Servir Archivo / Foto Subida (Prefijo /api/uploads)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/uploads/prospectos/prospecto_1.jpg",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "prospectos",
+                "prospecto_1.jpg"
+              ]
+            },
+            "description": "Sirve directamente cualquier archivo en uploads/ a través de la ruta estándar /api/uploads/<carpeta>/<archivo>.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Servir Archivo / Foto Subida (Ruta Raíz /uploads)",
           "request": {
             "method": "GET",
             "header": [],
@@ -2310,7 +2443,7 @@
                 "user_8.jpg"
               ]
             },
-            "description": "Sirve directamente el archivo físico alojado en la carpeta uploads/ (fotos de perfil, incidencias, prospectos).",
+            "description": "Sirve directamente el archivo físico alojado en la carpeta uploads/ desde la raíz del dominio.",
             "auth": {
               "type": "noauth"
             }

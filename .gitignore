@@ -5,5 +5,3 @@ __pycache__/
 firebase/
 *.json
 !firebase/piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json
-!postman/*.json
-!*.postman_collection.json
