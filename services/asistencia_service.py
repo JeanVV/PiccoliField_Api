@@ -239,8 +239,13 @@ class AsistenciaService:
                         "timestamp": time.time()
                     }
 
-            # Notificar en tiempo real a Administradores y Supervisores vía Push FCM (hilo daemon)
-            self._notificar_justificacion_en_segundo_plano(id_usuario, motivo)
+            # ── 3. ENVÍO DE NOTIFICACIÓN PUSH A ADMINISTRADORES ─────────────────
+            # Encapsulado estrictamente en try-except para que ningún fallo de Firebase
+            # afecte el guardado exitoso de la justificación en MySQL.
+            try:
+                self._notificar_justificacion_administradores()
+            except Exception as e_fcm:
+                print(f"[FCM JUSTIFICACION ERROR]: Error al procesar notificación Push: {e_fcm}")
 
             return resultado, "Justificación registrada exitosamente", 201
         except Exception as e:
@@ -249,80 +254,113 @@ class AsistenciaService:
             connection.close()
 
     @classmethod
-    def _notificar_justificacion_en_segundo_plano(cls, id_usuario, motivo):
+    def _notificar_justificacion_administradores(cls):
         """
-        Envía en segundo plano (daemon thread) la Notificación Push de nueva justificación
-        a todos los Administradores y Supervisores registrados.
+        Envía notificación push FCM a los administradores cuando se registra una justificación.
+        1. Consulta SQL en USUARIO_DISPOSITIVO con JOIN a USUARIOS:
+           SELECT ud.fcm_token 
+           FROM USUARIO_DISPOSITIVO ud
+           JOIN USUARIOS u ON ud.idUsuario = u.idUsuario
+           WHERE u.rol IN ('ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+             AND ud.activo = 1 
+             AND ud.fcm_token IS NOT NULL 
+             AND ud.fcm_token != ''
+        2. Por cada fcm_token obtenido, envía notificación push:
+           - Título: "Nueva Justificación Registrada"
+           - Cuerpo: "El colaborador ha presentado una justificación de inasistencia."
+           - Data: {"tipo": "JUSTIFICACION", "pantalla": "JUSTIFICACION"}
+        3. Totalmente protegido en try-except para salvaguardar el guardado en MySQL.
         """
-        def _job():
+        try:
+            conn = get_connection()
+            tokens = []
             try:
-                conn = get_connection()
                 try:
-                    repo = AsistenciaRepository(conn)
-                    # 1. Obtener nombre completo del colaborador (nombres + apePaterno)
+                    cursor = conn.cursor(dictionary=True)
+                except TypeError:
                     cursor = conn.cursor()
-                    cursor.execute(
-                        "SELECT nombres, apePaterno FROM USUARIOS WHERE idUsuario = %s LIMIT 1",
-                        (id_usuario,)
-                    )
-                    user_row = cursor.fetchone()
-                    cursor.close()
 
-                    if user_row:
-                        nombres = (user_row.get("nombres") or "").strip()
-                        apePaterno = (user_row.get("apePaterno") or "").strip()
-                        nombre_colaborador = f"{nombres} {apePaterno}".strip() or "Un colaborador"
-                    else:
-                        nombre_colaborador = "Un colaborador"
+                # 1. Consulta SQL para obtener tokens FCM activos de todos los administradores
+                sql = """
+                    SELECT ud.fcm_token 
+                    FROM USUARIO_DISPOSITIVO ud
+                    JOIN USUARIOS u ON ud.idUsuario = u.idUsuario
+                    WHERE u.rol IN ('ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                      AND ud.activo = 1 
+                      AND ud.fcm_token IS NOT NULL 
+                      AND ud.fcm_token != ''
+                """
+                cursor.execute(sql)
+                rows = cursor.fetchall() or []
+                for r in rows:
+                    tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                    if tok and str(tok).strip() and str(tok).strip() not in tokens:
+                        tokens.append(str(tok).strip())
 
-                    # 2. Obtener tokens FCM de USUARIO_DISPOSITIVO para Administradores y Supervisores
-                    dispositivos = repo.get_tokens_administradores_supervisores()
-                finally:
-                    conn.close()
+                # Fallback complementario desde USUARIOS.fcm_token
+                try:
+                    cursor.execute("""
+                        SELECT fcm_token FROM USUARIOS 
+                        WHERE rol IN ('ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                          AND fcm_token IS NOT NULL 
+                          AND fcm_token != ''
+                    """)
+                    for r in cursor.fetchall() or []:
+                        tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                        if tok and str(tok).strip() and str(tok).strip() not in tokens:
+                            tokens.append(str(tok).strip())
+                except Exception:
+                    pass
 
-                if not dispositivos:
-                    print("[FCM Justificación] No se encontraron dispositivos activos para Administradores o Supervisores.")
-                    return
+                cursor.close()
+            finally:
+                conn.close()
 
-                # 3. Construir mensaje Push FCM y Data Payload
-                titulo = "📩 Nueva Justificación Recibida"
-                body = f"{nombre_colaborador} envió un justificativo de {motivo} para su revisión."
-                data_payload = {
-                    "tipo": "JUSTIFICACION_RECIBIDA",
-                    "title": titulo,
-                    "body": body,
-                    "idUsuario": str(id_usuario)
-                }
+            if not tokens:
+                print("[FCM Justificación] No se encontraron tokens FCM activos de administradores/supervisores.")
+                return
 
-                # 4. Enviar notificación FCM a cada token único
-                tokens_procesados = set()
-                for d in dispositivos:
-                    token = d.get("fcm_token")
-                    id_destinatario = d.get("idUsuario")
-                    if not token or token in tokens_procesados:
-                        continue
-                    tokens_procesados.add(token)
+            titulo = "Nueva Justificación Registrada"
+            cuerpo = "El colaborador ha presentado una justificación de inasistencia."
+            data_payload = {
+                "tipo": "JUSTIFICACION",
+                "pantalla": "JUSTIFICACION"
+            }
 
+            # 2. Por cada fcm_token obtenido, enviar notificación push protegida en try-except
+            for token in tokens:
+                try:
                     ok, det = FCMService.enviar_a_token(
                         fcm_token=token,
                         titulo=titulo,
-                        mensaje=body,
+                        mensaje=cuerpo,
                         data=data_payload
                     )
+                    if ok:
+                        print(f"[FCM Justificación SUCCESS]: Enviado a {token[:20]}... ({det})")
+                    else:
+                        print(f"[FCM Justificación fallback]: {det}, intentando con firebase/fcm.py...")
+                        try:
+                            from firebase.fcm import notificar
+                            notificar(device_token=token, title=titulo, body=cuerpo, data=data_payload)
+                            print(f"[FCM Justificación SUCCESS]: Enviado con firebase/fcm a {token[:20]}...")
+                        except Exception as e_direct:
+                            print(f"[FCM Justificación ERROR]: Error al notificar token {token[:20]}...: {e_direct}")
+                except Exception as e_send:
+                    try:
+                        from firebase.fcm import notificar
+                        notificar(device_token=token, title=titulo, body=cuerpo, data=data_payload)
+                        print(f"[FCM Justificación SUCCESS]: Enviado con firebase/fcm a {token[:20]}...")
+                    except Exception as e_fb:
+                        print(f"[FCM Justificación ERROR]: Error al enviar push a token {token[:20]}...: {e_fb}")
 
-                    # Registrar en NOTIFICACIONES_LOG
-                    FCMService._guardar_log(
-                        idUsuario=id_destinatario,
-                        tipo="JUSTIFICACION_RECIBIDA",
-                        referencia=f"JUST-{id_usuario}",
-                        mensaje=body,
-                        resultado=det
-                    )
-            except Exception as e:
-                print(f"[FCM Justificación] Error en job de notificación en segundo plano: {e}")
+        except Exception as e_outer:
+            print(f"[FCM Justificación ERROR]: Error general en envío push (MySQL seguro): {e_outer}")
 
-        t = threading.Thread(target=_job, daemon=True)
-        t.start()
+    @classmethod
+    def _notificar_justificacion_en_segundo_plano(cls, id_usuario=None, motivo=None):
+        """Compatibilidad con versiones anteriores."""
+        cls._notificar_justificacion_administradores()
 
     # ── GET /api/asistencias/justificacion/<idUsuario> ────────────────────────
     def obtener_justificacion_usuario(self, idUsuario):
