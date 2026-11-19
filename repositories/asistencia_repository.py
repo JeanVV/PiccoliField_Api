@@ -153,7 +153,7 @@ class AsistenciaRepository:
             # 2. Control de duplicados el mismo día para INGRESO
             if tipo_upper == 'INGRESO':
                 sql_check = """
-                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora, estado
+                    SELECT idAsistencias, DATE_FORMAT(fecha_hora_servidor, '%%H:%%i:%%s') AS hora, estado
                     FROM ASISTENCIAS
                     WHERE idUsuario = %s AND tipo = 'INGRESO' AND DATE(fecha_hora_servidor) = CURDATE()
                     LIMIT 1
@@ -351,8 +351,8 @@ class AsistenciaRepository:
             query = """
                 SELECT 
                     idAsistencias AS id,
-                    DATE_FORMAT(fecha_hora_servidor, '%Y-%m-%d') AS fecha,
-                    DATE_FORMAT(fecha_hora_servidor, '%H:%i:%s') AS hora,
+                    DATE_FORMAT(fecha_hora_servidor, '%%Y-%%m-%%d') AS fecha,
+                    DATE_FORMAT(fecha_hora_servidor, '%%H:%%i:%%s') AS hora,
                     tipo,
                     estado,
                     latitud,
