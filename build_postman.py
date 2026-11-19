@@ -6,7 +6,7 @@ def build_collection():
         "info": {
             "_postman_id": "piccolifield-full-api-v2-updated",
             "name": "PiccoliField API - Colección Completa (Actualizada)",
-            "description": "Colección completa y exhaustiva con el 100% de rutas y endpoints de PiccoliField API.\nIncluye Autenticación, Perfil, Notificaciones, Puntos de Venta, Pedidos, Catálogo, Operaciones de Impulsador, Asistencias, Justificaciones, Supervisión, Prospectos, FCM y Archivos Multimedia.",
+            "description": "Colección completa y exhaustiva con el 100% de rutas y endpoints de PiccoliField API.\nIncluye Autenticación, Perfil, Fotos físicas en uploads/, Notificaciones, Puntos de Venta, Pedidos, Catálogo, Operaciones de Impulsador, Asistencias, Justificaciones, Supervisión, Prospectos (con conversión automática a PDV), FCM y Archivos Multimedia.",
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
         },
         "auth": {
@@ -25,13 +25,13 @@ def build_collection():
                 "key": "base_url",
                 "value": "https://piccolifield-api-smkc.onrender.com/api",
                 "type": "string",
-                "description": "URL base en Render. Para local usar: http://localhost:5000/api"
+                "description": "URL base en Render. Para pruebas en desarrollo local usar: http://localhost:5000/api"
             },
             {
                 "key": "base_host",
                 "value": "https://piccolifield-api-smkc.onrender.com",
                 "type": "string",
-                "description": "Host raíz sin prefijo /api (para uploads y rutas directas)"
+                "description": "Host raíz sin prefijo /api (para uploads y rutas directas). Para local usar: http://localhost:5000"
             },
             {
                 "key": "token",
@@ -43,7 +43,7 @@ def build_collection():
         "item": []
     }
 
-    def req(name, method, url, desc="", body=None, headers=None, auth_inherit=True, tests=None):
+    def req(name, method, url, desc="", body=None, formdata=None, headers=None, auth_inherit=True, tests=None):
         item = {
             "name": name,
             "request": {
@@ -61,7 +61,12 @@ def build_collection():
         if not auth_inherit:
             item["request"]["auth"] = {"type": "noauth"}
 
-        if body is not None:
+        if formdata is not None:
+            item["request"]["body"] = {
+                "mode": "formdata",
+                "formdata": formdata
+            }
+        elif body is not None:
             if isinstance(body, dict) or isinstance(body, list):
                 item["request"]["body"] = {
                     "mode": "raw",
@@ -98,7 +103,7 @@ def build_collection():
     # ─────────────────────────────────────────────────────────────────────────
     auth_folder = {
         "name": "0. Autenticación, Perfil y Notificaciones",
-        "description": "Login, perfil de usuario, tokens FCM, fotos de perfil y notificaciones push.",
+        "description": "Login, perfil de usuario, tokens FCM, fotos de perfil (físicas en uploads/perfiles/) y notificaciones push.",
         "item": [
             req(
                 name="Login (Iniciar Sesión)",
@@ -129,10 +134,19 @@ def build_collection():
                 name="Actualizar Mi Foto de Perfil (Base64)",
                 method="PUT",
                 url="{{base_url}}/perfil/foto",
-                desc="Actualiza la foto de perfil del usuario en sesión (formato Data URL base64 o ruta).",
+                desc="Actualiza la foto de perfil del usuario en sesión. La API decodifica el Base64, guarda el archivo en uploads/perfiles/ y almacena la ruta corta en MySQL.",
                 body={
                     "url_foto": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/..."
                 }
+            ),
+            req(
+                name="Actualizar Mi Foto de Perfil (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/perfil/foto",
+                desc="Permite subir la foto de perfil directamente como archivo físico multipart (campo 'foto').",
+                formdata=[
+                    {"key": "foto", "type": "file", "src": "", "description": "Seleccionar archivo de imagen .jpg/.png"}
+                ]
             ),
             req(
                 name="Obtener Mi Foto de Perfil (Stream)",
@@ -141,13 +155,22 @@ def build_collection():
                 desc="Devuelve la imagen física de la foto de perfil en streaming binario (JPEG/PNG)."
             ),
             req(
-                name="Actualizar Foto de un Usuario por ID (Admin / Web)",
+                name="Actualizar Foto de un Usuario por ID (Admin Base64)",
                 method="PUT",
                 url="{{base_url}}/usuarios/8/foto",
-                desc="Permite al administrador actualizar la foto de perfil de cualquier usuario en la base de datos.",
+                desc="Permite al administrador actualizar la foto de perfil de cualquier usuario mediante Base64 o ruta.",
                 body={
                     "url_foto": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/..."
                 }
+            ),
+            req(
+                name="Actualizar Foto de un Usuario por ID (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/usuarios/8/foto",
+                desc="Permite al administrador subir la imagen física del usuario mediante multipart/form-data (campo 'foto').",
+                formdata=[
+                    {"key": "foto", "type": "file", "src": "", "description": "Seleccionar imagen física"}
+                ]
             ),
             req(
                 name="Obtener Foto de un Usuario por ID (Stream)",
@@ -156,7 +179,7 @@ def build_collection():
                 desc="Retorna el archivo de imagen de perfil del usuario especificado por su idUsuario."
             ),
             req(
-                name="Actualizar FCM Token de Mi Perfil (Push)",
+                name="Actualizar FCM Token de Mi Perfil (PUT)",
                 method="PUT",
                 url="{{base_url}}/perfil/fcm-token",
                 desc="Registra o actualiza el token de Firebase Cloud Messaging (FCM) del dispositivo móvil para recibir notificaciones push.",
@@ -166,13 +189,31 @@ def build_collection():
                 }
             ),
             req(
-                name="Actualizar FCM Token (Ruta /api/usuario/fcm-token)",
+                name="Actualizar FCM Token de Mi Perfil (POST)",
+                method="POST",
+                url="{{base_url}}/perfil/fcm-token",
+                desc="Ruta POST alternativa para registrar o refrescar el token FCM de notificaciones push.",
+                body={
+                    "token": "fcm_token_generado_en_el_dispositivo_movil_firebase_123456"
+                }
+            ),
+            req(
+                name="Actualizar FCM Token (Alias /api/usuario/fcm-token)",
                 method="POST",
                 url="{{base_url}}/usuario/fcm-token",
                 desc="Ruta alias para registro de token FCM desde la aplicación móvil.",
                 body={
                     "token": "fcm_token_generado_en_el_dispositivo_movil_firebase_123456",
                     "dispositivo_info": "Xiaomi Redmi Note 12"
+                }
+            ),
+            req(
+                name="Actualizar FCM Token (Alias PUT /api/usuario/fcm-token)",
+                method="PUT",
+                url="{{base_url}}/usuario/fcm-token",
+                desc="Ruta alias con método PUT para actualizar el token FCM.",
+                body={
+                    "token": "fcm_token_generado_en_el_dispositivo_movil_firebase_123456"
                 }
             ),
             req(
@@ -195,7 +236,7 @@ def build_collection():
     # ─────────────────────────────────────────────────────────────────────────
     pdv_folder = {
         "name": "1. Puntos de Venta y Distribución",
-        "description": "Gestión de puntos de venta (tipo VENTA o DISTRIBUCIÓN), asignación de promotores/responsables e historial.",
+        "description": "Gestión de puntos de venta (tipo VENTA o DISTRIBUCIÓN), asignación de promotores/responsables, fotos de fachada e historial.",
         "item": [
             req(
                 name="Listar Puntos de Venta (Con Filtros)",
@@ -210,7 +251,7 @@ def build_collection():
                 desc="Obtiene los datos detallados de un punto de venta (código, nombre, dirección, geocerca, promotor asignado, tipo y estado)."
             ),
             req(
-                name="Asignar Responsable / Promotor a Punto de Venta (Admin)",
+                name="Asignar Responsable / Promotor a Punto de Venta (PUT)",
                 method="PUT",
                 url="{{base_url}}/puntos-venta/20/responsable",
                 desc="Asigna un promotor o vendedor responsable al punto de venta y registra el cambio en HISTORIAL_ASIGNACIONES.",
@@ -220,16 +261,53 @@ def build_collection():
                 }
             ),
             req(
+                name="Asignar Responsable / Promotor a Punto de Venta (POST)",
+                method="POST",
+                url="{{base_url}}/puntos-venta/20/responsable",
+                desc="Ruta POST alternativa para asignar responsable a un punto de venta.",
+                body={
+                    "idUsuario": 8,
+                    "motivo": "Asignación comercial inicial"
+                }
+            ),
+            req(
                 name="Historial de Asignaciones del Punto de Venta",
                 method="GET",
                 url="{{base_url}}/puntos-venta/20/historial",
                 desc="Lista el histórico de todos los promotores/vendedores que han sido asignados al punto de venta."
             ),
             req(
-                name="Actualizar Foto de Punto de Venta (Base64 o Multipart)",
+                name="Actualizar Foto de Punto de Venta (Base64)",
                 method="PUT",
                 url="{{base_url}}/puntos-venta/20/foto",
-                desc="Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la base de datos.",
+                desc="Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la BD.",
+                body={
+                    "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+                }
+            ),
+            req(
+                name="Actualizar Foto de Punto de Venta (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/puntos-venta/20/foto",
+                desc="Guarda la foto de fachada enviando un archivo físico en multipart (campo 'foto').",
+                formdata=[
+                    {"key": "foto", "type": "file", "src": "", "description": "Foto de fachada del local"}
+                ]
+            ),
+            req(
+                name="Actualizar Foto de PDV (Ruta Supervisión)",
+                method="PUT",
+                url="{{base_url}}/supervision/puntos-venta/20/foto",
+                desc="Ruta de supervisión para actualizar la foto de fachada del punto de venta.",
+                body={
+                    "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
+                }
+            ),
+            req(
+                name="Actualizar Foto de PDV (Ruta Supervisión POST)",
+                method="POST",
+                url="{{base_url}}/supervision/puntos-venta/20/foto",
+                desc="Ruta de supervisión POST alternativa para actualizar la foto de fachada.",
                 body={
                     "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
                 }
@@ -239,6 +317,12 @@ def build_collection():
                 method="GET",
                 url="{{base_url}}/puntos-venta/20/foto",
                 desc="Retorna en streaming binario la imagen del punto de venta o del prospecto del que fue convertido."
+            ),
+            req(
+                name="Obtener Foto de PDV (Ruta Supervisión Stream)",
+                method="GET",
+                url="{{base_url}}/supervision/puntos-venta/20/foto",
+                desc="Retorna en streaming la foto del punto de venta desde el módulo de supervisión."
             )
         ]
     }
@@ -280,32 +364,35 @@ def build_collection():
                 name="Registrar Pedido (Ruta Anidada /puntos-venta/:id/pedidos)",
                 method="POST",
                 url="{{base_url}}/puntos-venta/20/pedidos",
-                desc="Registra un pedido vinculando el idPuntosVenta desde la URL (ideal para app Android móvil).",
+                desc="Registra un pedido vinculando el idPuntosVenta directamente en la ruta URL.",
+                headers=[
+                    {"key": "X-Operation-Id", "value": "op-pedido-anidado-67890", "type": "text"}
+                ],
                 body={
                     "idProductos": 1,
-                    "cantSolicitada": 3
+                    "cantSolicitada": 10
                 }
             ),
             req(
-                name="Listar Pedidos de un Punto Específico",
+                name="Listar Pedidos de un Punto de Venta Específico",
                 method="GET",
                 url="{{base_url}}/puntos-venta/20/pedidos",
-                desc="Obtiene todos los pedidos asociados al punto de venta especificado en la ruta."
+                desc="Consulta únicamente el historial de pedidos pertenecientes al punto de venta indicado."
             ),
             req(
-                name="Actualizar Estado del Pedido (Despacho - Admin)",
+                name="Actualizar Estado del Pedido (Despacho)",
                 method="PUT",
                 url="{{base_url}}/pedidos/1/estado",
-                desc="Cambia el estado del pedido: REGISTRADO -> EN_PREPARACION -> ENTREGADO (o CANCELADO). Solo para Administrador.",
+                desc="Actualiza el estado: REGISTRADO -> EN_PREPARACION -> ENTREGADO (o CANCELADO). Al pasar a ENTREGADO descuenta inventario.",
                 body={
                     "estado": "EN_PREPARACION"
                 }
             ),
             req(
-                name="Actualizar Estado a ENTREGADO (Despacho)",
+                name="Actualizar Estado del Pedido (Método PATCH)",
                 method="PATCH",
                 url="{{base_url}}/pedidos/1/estado",
-                desc="Marca el pedido como ENTREGADO una vez despachado y entregado al punto de distribución.",
+                desc="Actualización parcial del estado del pedido mediante método PATCH.",
                 body={
                     "estado": "ENTREGADO"
                 }
@@ -314,39 +401,39 @@ def build_collection():
     }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 3. CATÁLOGO DE PRODUCTOS
+    # 3. CATÁLOGO Y PRODUCTOS
     # ─────────────────────────────────────────────────────────────────────────
     productos_folder = {
-        "name": "3. Catálogo de Productos",
-        "description": "Catálogo general de licores y macerados de Piccoli.",
+        "name": "3. Catálogo y Productos",
+        "description": "Consulta de catálogo de licores y bebidas artesanales, búsqueda por código de barras (EAN-13 / UPC).",
         "item": [
             req(
-                name="Listar Catálogo de Productos Activos",
+                name="Listar Productos del Catálogo",
                 method="GET",
-                url="{{base_url}}/productos",
-                desc="Obtiene la lista de productos activos de la empresa con SKU, EAN, precios y categoría."
-            ),
-            req(
-                name="Buscar Producto por Código EAN o SKU",
-                method="GET",
-                url="{{base_url}}/productos/ean/7751234567890",
-                desc="Busca un producto por su código de barras EAN o su código SKU único."
+                url="{{base_url}}/productos?activo=1",
+                desc="Devuelve todos los productos del catálogo comercial (ID, nombre, descripción, SKU, EAN, precio sugerido, foto)."
             ),
             req(
                 name="Detalle de Producto por ID",
                 method="GET",
                 url="{{base_url}}/productos/1",
-                desc="Devuelve la ficha técnica completa del producto especificado por su idProductos."
+                desc="Información detallada de un producto específico del catálogo."
+            ),
+            req(
+                name="Buscar Producto por Código de Barras EAN",
+                method="GET",
+                url="{{base_url}}/productos/ean/7751234567890",
+                desc="Busca un producto por su código EAN-13 o código de barras estándar para visualización y venta rápida."
             )
         ]
     }
 
     # ─────────────────────────────────────────────────────────────────────────
-    # 4. IMPULSADOR (OPERACIONES EN CAMPO E INCIDENCIAS)
+    # 4. OPERACIONES DE IMPULSADOR
     # ─────────────────────────────────────────────────────────────────────────
     impulsador_folder = {
-        "name": "4. Impulsador (Operaciones en Campo e Incidencias)",
-        "description": "Dashboard, ventas con lector de barras, reposición de stock, incidencias y catálogo del local asignado.",
+        "name": "4. Operaciones de Impulsador",
+        "description": "Venta rápida por código de barras, reposición de stock (evidencias en uploads/evidencias/), reporte de incidencias y dashboard del promotor.",
         "item": [
             req(
                 name="Dashboard del Impulsador",
@@ -390,17 +477,32 @@ def build_collection():
                 }
             ),
             req(
-                name="Reponer Stock de Producto",
+                name="Reponer Stock de Producto (Base64)",
                 method="POST",
                 url="{{base_url}}/impulsador/stock/reponer",
-                desc="Actualiza las unidades en exhibición y almacén del producto en el punto de venta.",
+                desc="Actualiza las unidades en exhibición y almacén del producto. Guarda la foto física en uploads/evidencias/reposicion_...jpg y registra la ruta en MySQL.",
                 body={
                     "idProductos": 1,
                     "cantExhibida": 15,
                     "cantAlmacen": 30,
                     "idPuntosVenta": 1,
-                    "observacion": "Reposición matutina de anaqueles"
+                    "observacion": "Reposición matutina de anaqueles",
+                    "foto": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
                 }
+            ),
+            req(
+                name="Reponer Stock de Producto (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/impulsador/stock/reponer",
+                desc="Permite subir la evidencia física de reposición como archivo multipart (campo 'foto').",
+                formdata=[
+                    {"key": "idProductos", "value": "1", "type": "text"},
+                    {"key": "cantExhibida", "value": "15", "type": "text"},
+                    {"key": "cantAlmacen", "value": "30", "type": "text"},
+                    {"key": "idPuntosVenta", "value": "1", "type": "text"},
+                    {"key": "observacion", "value": "Góndola reabastecida al 100%", "type": "text"},
+                    {"key": "foto", "type": "file", "src": "", "description": "Foto de anaquel reabastecido"}
+                ]
             ),
             req(
                 name="Reponer Stock (Alias /productos/reponer)",
@@ -421,10 +523,10 @@ def build_collection():
                 desc="Obtiene los tipos de incidencia permitidos en el sistema (STOCK, EXHIBICION, ROTURA, COMPETENCIA, etc.)."
             ),
             req(
-                name="Reportar Incidencia en Local",
+                name="Reportar Incidencia en Local (Base64)",
                 method="POST",
                 url="{{base_url}}/impulsador/incidencias",
-                desc="Registra una incidencia detectada en el punto de venta con nivel de severidad y sustento.",
+                desc="Registra una incidencia detectada en el punto de venta. Guarda la evidencia en uploads/evidencias/incidencia_...jpg y la ruta en EVIDENCIAS.ruta_archivo.",
                 body={
                     "tipo": "ROTURA",
                     "descripcion": "Se quebró una botella de licor de cacao en el pasillo central",
@@ -432,6 +534,19 @@ def build_collection():
                     "idPuntosVenta": 1,
                     "foto": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
                 }
+            ),
+            req(
+                name="Reportar Incidencia en Local (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/impulsador/incidencias",
+                desc="Reporta una incidencia enviando la fotografía física directamente como archivo multipart.",
+                formdata=[
+                    {"key": "tipo", "value": "ROTURA", "type": "text"},
+                    {"key": "descripcion", "value": "Botella rota por caída accidental", "type": "text"},
+                    {"key": "severidad", "value": "ALTA", "type": "text"},
+                    {"key": "idPuntosVenta", "value": "1", "type": "text"},
+                    {"key": "foto", "type": "file", "src": "", "description": "Foto de la incidencia"}
+                ]
             ),
             req(
                 name="Listar Incidencias Reportadas por el Impulsador",
@@ -459,7 +574,7 @@ def build_collection():
     # ─────────────────────────────────────────────────────────────────────────
     asistencia_folder = {
         "name": "5. Asistencias y Justificaciones",
-        "description": "Marcación de asistencias (Ingreso/Salida), justificaciones, revisión y disparo de resumen diario (10:30 AM).",
+        "description": "Marcación de asistencias (Ingreso/Salida), justificaciones con foto física en uploads/justificaciones/, revisión y disparo de resumen diario (10:30 AM).",
         "item": [
             req(
                 name="Resumen General de Asistencias del Día",
@@ -492,10 +607,22 @@ def build_collection():
                 desc="Devuelve el último registro de asistencia de un colaborador para validar si ya marcó ingreso o salida."
             ),
             req(
+                name="Última Asistencia (Ruta raíz /asistencias/ultima)",
+                method="GET",
+                url="{{base_host}}/asistencias/ultima?idUsuario=8",
+                desc="Ruta directa de compatibilidad para consultar la última asistencia del usuario."
+            ),
+            req(
                 name="Historial de Asistencias por Colaborador",
                 method="GET",
                 url="{{base_url}}/asistencias/historial/8",
                 desc="Histórico detallado de todas las marcas de asistencia del colaborador indicado."
+            ),
+            req(
+                name="Historial de Asistencias (Ruta raíz /historial/:id)",
+                method="GET",
+                url="{{base_host}}/historial/8",
+                desc="Ruta directa de compatibilidad para consultar el historial de un colaborador."
             ),
             req(
                 name="Marcar Asistencia (Ingreso o Salida)",
@@ -525,10 +652,10 @@ def build_collection():
                 }
             ),
             req(
-                name="Registrar Justificación de Inasistencia / Tardanza",
+                name="Registrar Justificación (Base64)",
                 method="POST",
                 url="{{base_url}}/asistencias/justificar",
-                desc="Envía una justificación de falta o tardanza con motivo, descripción y foto de sustento médica/laboral.",
+                desc="Envía justificación de falta o tardanza. Guarda la imagen en uploads/justificaciones/justif_{idUsuario}_{ts}.jpg y la ruta en JUSTIFICACIONES.ruta_sustento.",
                 body={
                     "idUsuario": 8,
                     "motivo": "SALUD",
@@ -536,6 +663,19 @@ def build_collection():
                     "fecha": "2026-11-19",
                     "fotoSustentoBase64": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
                 }
+            ),
+            req(
+                name="Registrar Justificación (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/asistencias/justificar",
+                desc="Permite adjuntar el archivo físico de sustento médico mediante multipart/form-data (campo 'foto').",
+                formdata=[
+                    {"key": "idUsuario", "value": "8", "type": "text"},
+                    {"key": "motivo", "value": "SALUD", "type": "text"},
+                    {"key": "descripcion", "value": "Descanso médico emitido por ESSALUD", "type": "text"},
+                    {"key": "fecha", "value": "2026-11-19", "type": "text"},
+                    {"key": "foto", "type": "file", "src": "", "description": "Certificado o receta médica física"}
+                ]
             ),
             req(
                 name="Registrar Justificación (Ruta directa /justificar)",
@@ -556,6 +696,12 @@ def build_collection():
                 desc="Consulta la última o todas las justificaciones enviadas por un colaborador y su estado (PENDIENTE, APROBADA, RECHAZADA)."
             ),
             req(
+                name="Ver Justificaciones (Ruta raíz /justificacion/:id)",
+                method="GET",
+                url="{{base_host}}/justificacion/8",
+                desc="Ruta directa alternativa para consultar justificaciones de un usuario."
+            ),
+            req(
                 name="Revisar Justificación (Aprobar / Rechazar)",
                 method="POST",
                 url="{{base_url}}/asistencias/justificacion/revisar",
@@ -569,10 +715,37 @@ def build_collection():
                 }
             ),
             req(
-                name="Disparar Notificación de Resumen Diario (10:30 AM / Manual)",
+                name="Revisar Justificación (Ruta raíz /justificacion/revisar)",
+                method="POST",
+                url="{{base_host}}/justificacion/revisar",
+                desc="Ruta directa alternativa para revisar y validar justificaciones."
+            ),
+            req(
+                name="Disparar Notificación de Resumen Diario (POST /api/asistencias/notificar-resumen)",
                 method="POST",
                 url="{{base_url}}/asistencias/notificar-resumen",
                 desc="Ejecuta manualmente el resumen diario de asistencias y envía las notificaciones push a los Administradores y Supervisores.",
+                auth_inherit=False
+            ),
+            req(
+                name="Disparar Notificación de Resumen Diario (GET /api/asistencias/notificar-resumen)",
+                method="GET",
+                url="{{base_url}}/asistencias/notificar-resumen",
+                desc="Permite invocar el resumen de asistencias mediante método GET para tareas automatizadas tipo cron web.",
+                auth_inherit=False
+            ),
+            req(
+                name="Disparar Notificación de Resumen (Ruta raíz POST /notificar-resumen)",
+                method="POST",
+                url="{{base_host}}/notificar-resumen",
+                desc="Ruta raíz directa para ejecutar el resumen de asistencias diario.",
+                auth_inherit=False
+            ),
+            req(
+                name="Disparar Notificación de Resumen (Ruta raíz GET /notificar-resumen)",
+                method="GET",
+                url="{{base_host}}/notificar-resumen",
+                desc="Ruta raíz directa GET alternativa para webhook o cron job.",
                 auth_inherit=False
             )
         ]
@@ -598,105 +771,185 @@ def build_collection():
                 desc="Ranking de vendedores por volumen de ventas y cumplimiento de metas comerciales."
             ),
             req(
-                name="Detalle de Vendedor por ID",
+                name="Detalle de Vendedor",
                 method="GET",
                 url="{{base_url}}/supervision/vendedores/8",
-                desc="Ficha completa del vendedor, local actual asignado y resumen de rendimiento."
+                desc="Perfil comercial completo del vendedor: histórico de ventas, puntos asignados y efectividad."
             ),
             req(
                 name="Historial de Asignaciones de Vendedor",
                 method="GET",
                 url="{{base_url}}/supervision/vendedores/8/historial-asignaciones",
-                desc="Locales y puntos de venta donde ha sido asignado el colaborador históricamente."
+                desc="Locales y rutas que ha tenido asignados el vendedor a lo largo del tiempo."
+            ),
+            req(
+                name="Historial de Asignaciones (Alias /personal/:id/historial-asignaciones)",
+                method="GET",
+                url="{{base_url}}/supervision/personal/8/historial-asignaciones",
+                desc="Ruta alias para consultar historial de asignaciones de personal."
+            ),
+            req(
+                name="Historial de Asignaciones (Alias /impulsadores/:id/historial-asignaciones)",
+                method="GET",
+                url="{{base_url}}/supervision/impulsadores/8/historial-asignaciones",
+                desc="Ruta alias para consultar historial de asignaciones de impulsadores."
             ),
             req(
                 name="Rendimiento Histórico de Vendedor",
                 method="GET",
-                url="{{base_url}}/supervision/vendedores/8/rendimiento-historico?anio=2026",
-                desc="Ventas mensuales acumuladas a lo largo del año para análisis de desempeño."
+                url="{{base_url}}/supervision/vendedores/8/rendimiento-historico",
+                desc="Gráfico y métricas de desempeño histórico de ventas del colaborador."
             ),
             req(
-                name="Reasignar Vendedor a Punto de Venta",
-                method="PUT",
+                name="Rendimiento Histórico (Alias /personal/:id/rendimiento-historico)",
+                method="GET",
+                url="{{base_url}}/supervision/personal/8/rendimiento-historico",
+                desc="Ruta alias para consultar rendimiento histórico de personal."
+            ),
+            req(
+                name="Rendimiento Histórico (Alias /impulsadores/:id/rendimiento-historico)",
+                method="GET",
+                url="{{base_url}}/supervision/impulsadores/8/rendimiento-historico",
+                desc="Ruta alias para consultar rendimiento histórico de impulsadores."
+            ),
+            req(
+                name="Reasignar Vendedor a Punto de Venta (POST)",
+                method="POST",
                 url="{{base_url}}/supervision/vendedores/8/reasignar",
-                desc="Cambia el local asignado de un vendedor e inserta registro en HISTORIAL_ASIGNACIONES.",
+                desc="Cambia el punto de venta donde opera el vendedor y registra el motivo en la auditoría.",
                 body={
                     "idPuntosVenta": 2,
-                    "motivo": "Refuerzo comercial por campaña navideña"
+                    "motivo": "Relevo por incremento de demanda de fin de semana"
                 }
             ),
             req(
-                name="Listar Todos los Impulsadores",
+                name="Reasignar Vendedor (PUT /supervision/vendedores/:id/reasignar)",
+                method="PUT",
+                url="{{base_url}}/supervision/vendedores/8/reasignar",
+                desc="Método PUT alternativo para reasignar vendedor a otro local.",
+                body={
+                    "idPuntosVenta": 2,
+                    "motivo": "Reasignación de zona"
+                }
+            ),
+            req(
+                name="Reasignar Personal (Alias POST /personal/:id/reasignar)",
+                method="POST",
+                url="{{base_url}}/supervision/personal/8/reasignar",
+                desc="Ruta alias para reasignar personal de campo.",
+                body={
+                    "idPuntosVenta": 2,
+                    "motivo": "Reasignación operativa"
+                }
+            ),
+            req(
+                name="Reasignar Personal (Alias PUT /personal/:id/reasignar)",
+                method="PUT",
+                url="{{base_url}}/supervision/personal/8/reasignar",
+                desc="Ruta alias PUT para reasignar personal.",
+                body={
+                    "idPuntosVenta": 2,
+                    "motivo": "Rotación periódica"
+                }
+            ),
+            req(
+                name="Reasignar Impulsador (Alias POST /impulsadores/:id/reasignar)",
+                method="POST",
+                url="{{base_url}}/supervision/impulsadores/8/reasignar",
+                desc="Ruta alias POST para reasignar impulsadores.",
+                body={
+                    "idPuntosVenta": 2,
+                    "motivo": "Cobertura especial"
+                }
+            ),
+            req(
+                name="Reasignar Impulsador (Alias PUT /impulsadores/:id/reasignar)",
+                method="PUT",
+                url="{{base_url}}/supervision/impulsadores/8/reasignar",
+                desc="Ruta alias PUT para reasignar impulsadores.",
+                body={
+                    "idPuntosVenta": 2,
+                    "motivo": "Rotación comercial"
+                }
+            ),
+            req(
+                name="Reasignar Impulsador (Ruta Global /reasignar-impulsador)",
+                method="POST",
+                url="{{base_url}}/supervision/reasignar-impulsador",
+                desc="Endpoint centralizado para cambiar de local a cualquier impulsador.",
+                body={
+                    "idUsuario": 8,
+                    "idPuntosVenta": 3,
+                    "motivo": "Cobertura en Plaza Norte"
+                }
+            ),
+            req(
+                name="Listar Impulsadores (Supervisión)",
                 method="GET",
                 url="{{base_url}}/supervision/impulsadores",
-                desc="Lista de impulsadores con sus locales asignados y estado actual."
+                desc="Lista todo el personal de campo registrado para supervisión operativa."
             ),
             req(
                 name="Foto de Impulsador",
                 method="GET",
                 url="{{base_url}}/supervision/impulsadores/8/foto",
-                desc="Devuelve la foto del impulsador para visualización en el panel de supervisión."
-            ),
-            req(
-                name="Reasignar Personal (Ruta Genérica /personal/:id/reasignar)",
-                method="POST",
-                url="{{base_url}}/supervision/personal/8/reasignar",
-                desc="Ruta unificada para reasignar cualquier tipo de personal de campo a un nuevo punto de venta.",
-                body={
-                    "idPuntosVenta": 3,
-                    "motivo": "Reubicación estratégica de zona"
-                }
-            ),
-            req(
-                name="Reasignar Impulsador (Ruta Directa por Body)",
-                method="POST",
-                url="{{base_url}}/supervision/reasignar-impulsador",
-                desc="Reasignación enviando tanto el idPuntosVenta como el idUsuario en el cuerpo JSON.",
-                body={
-                    "idPuntosVenta": 2,
-                    "idUsuario": 8,
-                    "motivo": "Rotación programada de personal"
-                }
+                desc="Obtiene la foto de perfil del impulsador indicado."
             ),
             req(
                 name="Listar Puntos de Venta (Supervisión)",
                 method="GET",
-                url="{{base_url}}/supervision/puntos-venta?estado=ACTIVO",
-                desc="Lista todos los locales comerciales con su impulsador asignado, stock y estado."
+                url="{{base_url}}/supervision/puntos-venta",
+                desc="Lista todos los puntos de venta con métricas de ventas y cobertura de impulsadores."
             ),
             req(
                 name="Detalle de Punto de Venta (Supervisión)",
                 method="GET",
                 url="{{base_url}}/supervision/puntos-venta/1",
-                desc="Ficha completa del punto de venta con dirección, coordenadas y responsable."
-            ),
-            req(
-                name="Historial de Impulsadores en Punto de Venta",
-                method="GET",
-                url="{{base_url}}/supervision/puntos-venta/1/historial",
-                desc="Lista de todos los colaboradores que han estado a cargo del punto de venta."
-            ),
-            req(
-                name="Reasignar Impulsador desde el Punto de Venta",
-                method="PUT",
-                url="{{base_url}}/supervision/puntos-venta/1/reasignar",
-                desc="Asigna un nuevo impulsador al punto de venta especificado en la URL.",
-                body={
-                    "idUsuario": 8,
-                    "motivo": "Cubrir descanso médico del titular"
-                }
+                desc="Ficha completa del punto de venta con estado, responsable y coordenadas."
             ),
             req(
                 name="Stock de Productos en Punto de Venta",
                 method="GET",
                 url="{{base_url}}/supervision/puntos-venta/1/stock",
-                desc="Stock actual en góndola y almacén de todos los productos en el local seleccionado."
+                desc="Consulta el inventario actual de botellas en exhibición y almacén del punto de venta."
             ),
             req(
-                name="Listar Alertas de Stock",
+                name="Stock de Productos (Alias /productos)",
                 method="GET",
-                url="{{base_url}}/supervision/alertas",
-                desc="Lista alertas generadas cuando el stock cae por debajo del nivel mínimo (PENDIENTE / ATENDIDA / IGNORADA)."
+                url="{{base_url}}/supervision/puntos-venta/1/productos",
+                desc="Ruta alternativa para obtener el inventario de productos del punto de venta."
+            ),
+            req(
+                name="Historial de Impulsadores en Punto de Venta",
+                method="GET",
+                url="{{base_url}}/supervision/puntos-venta/1/historial",
+                desc="Historial de colaboradores que han estado destacados en este local comercial."
+            ),
+            req(
+                name="Reasignar Impulsador desde Punto de Venta (POST)",
+                method="POST",
+                url="{{base_url}}/supervision/puntos-venta/1/reasignar",
+                desc="Asigna un nuevo impulsador al punto de venta indicado.",
+                body={
+                    "idUsuario": 8,
+                    "motivo": "Cobertura del turno tarde"
+                }
+            ),
+            req(
+                name="Reasignar Impulsador desde PDV (PUT)",
+                method="PUT",
+                url="{{base_url}}/supervision/puntos-venta/1/reasignar",
+                desc="Método PUT para reasignar impulsador a un punto de venta.",
+                body={
+                    "idUsuario": 8,
+                    "motivo": "Relevo semanal"
+                }
+            ),
+            req(
+                name="Listar Alertas de Stock Pendientes",
+                method="GET",
+                url="{{base_url}}/supervision/alertas?estado=PENDIENTE",
+                desc="Lista las alertas por quiebre de stock o producto crítico en anaqueles."
             ),
             req(
                 name="Detalle de Alerta de Stock",
@@ -705,7 +958,7 @@ def build_collection():
                 desc="Detalle del producto en desabastecimiento, punto de venta y fecha de la alerta."
             ),
             req(
-                name="Cambiar Estado de Alerta (Atender / Ignorar)",
+                name="Cambiar Estado de Alerta (PATCH)",
                 method="PATCH",
                 url="{{base_url}}/supervision/alertas/1/estado",
                 desc="Actualiza el estado de la alerta de stock con un comentario explicativo.",
@@ -715,7 +968,27 @@ def build_collection():
                 }
             ),
             req(
-                name="Marcar Alerta como Atendida",
+                name="Cambiar Estado de Alerta (PUT)",
+                method="PUT",
+                url="{{base_url}}/supervision/alertas/1/estado",
+                desc="Método PUT para cambiar el estado de la alerta.",
+                body={
+                    "estado": "ATENDIDA",
+                    "comentario": "Stock repuesto en tienda"
+                }
+            ),
+            req(
+                name="Cambiar Estado de Alerta (POST)",
+                method="POST",
+                url="{{base_url}}/supervision/alertas/1/estado",
+                desc="Método POST para cambiar el estado de la alerta.",
+                body={
+                    "estado": "ATENDIDA",
+                    "comentario": "Alerta atendida satisfactoriamente"
+                }
+            ),
+            req(
+                name="Marcar Alerta como Atendida (PUT)",
                 method="PUT",
                 url="{{base_url}}/supervision/alertas/1/atender",
                 desc="Acceso directo para marcar la alerta como resuelta/atendida.",
@@ -724,12 +997,30 @@ def build_collection():
                 }
             ),
             req(
-                name="Marcar Alerta como Ignorada",
+                name="Marcar Alerta como Atendida (POST)",
+                method="POST",
+                url="{{base_url}}/supervision/alertas/1/atender",
+                desc="Método POST alternativo para marcar la alerta como atendida.",
+                body={
+                    "comentario": "Mercadería recibida en góndola"
+                }
+            ),
+            req(
+                name="Marcar Alerta como Ignorada (PUT)",
                 method="PUT",
                 url="{{base_url}}/supervision/alertas/1/ignorar",
                 desc="Ignora la alerta (por ejemplo, si el producto se retiró de exhibición deliberadamente).",
                 body={
                     "comentario": "Local en inventario general"
+                }
+            ),
+            req(
+                name="Marcar Alerta como Ignorada (POST)",
+                method="POST",
+                url="{{base_url}}/supervision/alertas/1/ignorar",
+                desc="Método POST alternativo para ignorar una alerta de stock.",
+                body={
+                    "comentario": "Producto descontinuado temporalmente"
                 }
             ),
             req(
@@ -745,13 +1036,23 @@ def build_collection():
                 desc="Información completa de la incidencia y fecha de reporte."
             ),
             req(
-                name="Atender / Resolver Incidencia",
+                name="Atender / Resolver Incidencia (PUT)",
                 method="PUT",
                 url="{{base_url}}/supervision/incidencias/1/atender",
                 desc="El supervisor da por atendida o resuelta la incidencia registrando la solución aplicada.",
                 body={
                     "estado": "RESUELTO",
                     "comentario": "Se coordinó con el área logística la reposición del material dañado"
+                }
+            ),
+            req(
+                name="Atender / Resolver Incidencia (POST)",
+                method="POST",
+                url="{{base_url}}/supervision/incidencias/1/atender",
+                desc="Método POST alternativo para resolver una incidencia.",
+                body={
+                    "estado": "RESUELTO",
+                    "comentario": "Incidencia atendida en local"
                 }
             ),
             req(
@@ -774,7 +1075,7 @@ def build_collection():
     # ─────────────────────────────────────────────────────────────────────────
     prospectos_folder = {
         "name": "7. Prospectos (Puntos Potenciales)",
-        "description": "Registro de clientes potenciales, pipeline de negociación, conversión automática a Punto de Venta (Distribución) y seguimientos.",
+        "description": "Registro de clientes potenciales, fotos de fachada (físicas en uploads/evidencias/ y uploads/prospectos/), pipeline de negociación, conversión automática a Punto de Venta (Distribución) y seguimientos.",
         "item": [
             req(
                 name="Listar Prospectos (Con Filtros)",
@@ -789,10 +1090,10 @@ def build_collection():
                 desc="Obtiene los datos completos del prospecto junto con todo su historial de seguimientos comerciales."
             ),
             req(
-                name="Registrar Nuevo Prospecto",
+                name="Registrar Nuevo Prospecto (JSON con Base64 / Ruta)",
                 method="POST",
                 url="{{base_url}}/prospectos",
-                desc="Registra un nuevo prospecto comercial en la base de datos.",
+                desc="Registra un prospecto. Si envía foto_fachada o url_foto en Base64, el servidor la guarda en uploads/evidencias/ y registra la ruta corta en MySQL.",
                 body={
                     "nombre_comercial": "Licorería El Parral",
                     "tipo_local": "Licorería",
@@ -809,6 +1110,26 @@ def build_collection():
                 }
             ),
             req(
+                name="Registrar Nuevo Prospecto (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/prospectos",
+                desc="Permite registrar el prospecto adjuntando directamente el archivo físico de fachada (campo 'foto').",
+                formdata=[
+                    {"key": "nombre_comercial", "value": "Bodega Santa Rosa", "type": "text"},
+                    {"key": "tipo_local", "value": "Bodega", "type": "text"},
+                    {"key": "direccion", "value": "Calle Dos de Mayo 1291", "type": "text"},
+                    {"key": "contacto", "value": "Alfonso Llontop", "type": "text"},
+                    {"key": "telefono", "value": "999792030", "type": "text"},
+                    {"key": "potencial", "value": "MEDIO", "type": "text"},
+                    {"key": "estado", "value": "NUEVO", "type": "text"},
+                    {"key": "latitud", "value": "-6.771234", "type": "text"},
+                    {"key": "longitud", "value": "-79.839876", "type": "text"},
+                    {"key": "idDistrito", "value": "1", "type": "text"},
+                    {"key": "notas", "value": "Cliente con buen flujo peatonal", "type": "text"},
+                    {"key": "foto", "type": "file", "src": "", "description": "Fotografía de fachada del local"}
+                ]
+            ),
+            req(
                 name="Actualizar Datos de Prospecto",
                 method="PUT",
                 url="{{base_url}}/prospectos/1",
@@ -821,7 +1142,7 @@ def build_collection():
                 }
             ),
             req(
-                name="Cambiar Estado de Prospecto (Al CONVERTIR -> Crea Punto de Venta)",
+                name="Cambiar Estado de Prospecto (Al CONVERTIR -> Crea Punto de Venta en BD)",
                 method="PUT",
                 url="{{base_url}}/prospectos/1/estado",
                 desc="Actualiza el estado: NUEVO, EN_NEGOCIACION, CONVERTIDO o DESCARTADO. Si se envía CONVERTIDO, la API crea automáticamente un registro en PUNTOS_VENTA con tipo DISTRIBUCIÓN.",
@@ -830,20 +1151,38 @@ def build_collection():
                 }
             ),
             req(
-                name="Descartar Prospecto (Con Motivo)",
+                name="Cambiar Estado a EN_NEGOCIACION",
+                method="PUT",
+                url="{{base_url}}/prospectos/1/estado",
+                desc="Pasa el estado a EN_NEGOCIACION cuando se inician tratos formales.",
+                body={
+                    "estado": "EN_NEGOCIACION"
+                }
+            ),
+            req(
+                name="Descartar Prospecto (Con Motivo de Descarte)",
                 method="PATCH",
                 url="{{base_url}}/prospectos/1/estado",
-                desc="Pasa el estado a DESCARTADO especificando el motivo del descarte.",
+                desc="Pasa el estado a DESCARTADO especificando el motivo del descarte en MySQL.",
                 body={
                     "estado": "DESCARTADO",
                     "motivo_descarte": "Volumen de compra muy bajo para venta mayorista"
                 }
             ),
             req(
-                name="Asignar Promotor a Prospecto",
+                name="Asignar Promotor a Prospecto (PUT)",
                 method="PUT",
                 url="{{base_url}}/prospectos/1/asignar",
                 desc="Asigna el promotor responsable de cerrar la negociación con el prospecto.",
+                body={
+                    "idUsuario": 8
+                }
+            ),
+            req(
+                name="Asignar Promotor a Prospecto (POST)",
+                method="POST",
+                url="{{base_url}}/prospectos/1/asignar",
+                desc="Ruta POST alternativa para asignar promotor comercial a un prospecto.",
                 body={
                     "idUsuario": 8
                 }
@@ -867,19 +1206,28 @@ def build_collection():
                 desc="Obtiene la cronología completa de visitas, llamadas y acuerdos realizados con el prospecto."
             ),
             req(
-                name="Actualizar Foto de Prospecto (Base64 o Multipart)",
+                name="Actualizar Foto de Prospecto (Base64)",
                 method="PUT",
                 url="{{base_url}}/prospectos/1/foto",
-                desc="Guarda la fotografía de fachada del prospecto en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la base de datos.",
+                desc="Guarda la fotografía física en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la BD.",
                 body={
                     "foto_fachada": "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
                 }
             ),
             req(
+                name="Actualizar Foto de Prospecto (Multipart Form-Data)",
+                method="POST",
+                url="{{base_url}}/prospectos/1/foto",
+                desc="Sube la fotografía física de fachada de un prospecto existente en multipart/form-data (campo 'foto').",
+                formdata=[
+                    {"key": "foto", "type": "file", "src": "", "description": "Archivo de imagen de fachada"}
+                ]
+            ),
+            req(
                 name="Obtener Foto de Prospecto (Stream)",
                 method="GET",
                 url="{{base_url}}/prospectos/1/foto",
-                desc="Retorna en streaming binario la imagen registrada del prospecto."
+                desc="Retorna en streaming binario la imagen física registrada del prospecto."
             )
         ]
     }
@@ -911,20 +1259,48 @@ def build_collection():
     # ─────────────────────────────────────────────────────────────────────────
     uploads_folder = {
         "name": "9. Archivos y Multimedia (Uploads)",
-        "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas.",
+        "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas en el servidor.",
         "item": [
             req(
-                name="Servir Archivo / Foto Subida (Prefijo /api/uploads)",
+                name="Estado del Servidor API (Ruta Raíz /)",
+                method="GET",
+                url="{{base_host}}/",
+                desc="Verifica la disponibilidad del servidor Flask y estado de la API REST.",
+                auth_inherit=False
+            ),
+            req(
+                name="Servir Foto de Prospecto (Prefijo /api/uploads)",
                 method="GET",
                 url="{{base_url}}/uploads/prospectos/prospecto_1.jpg",
                 desc="Sirve directamente cualquier archivo en uploads/ a través de la ruta estándar /api/uploads/<carpeta>/<archivo>.",
                 auth_inherit=False
             ),
             req(
-                name="Servir Archivo / Foto Subida (Ruta Raíz /uploads)",
+                name="Servir Foto de Perfil (Ruta Raíz /uploads)",
                 method="GET",
                 url="{{base_host}}/uploads/perfiles/user_8.jpg",
                 desc="Sirve directamente el archivo físico alojado en la carpeta uploads/ desde la raíz del dominio.",
+                auth_inherit=False
+            ),
+            req(
+                name="Servir Evidencia de Incidencia o Reposición",
+                method="GET",
+                url="{{base_url}}/uploads/evidencias/incidencia_8_1700000000.jpg",
+                desc="Descarga la foto de evidencia física guardada para incidencias o reposición de stock.",
+                auth_inherit=False
+            ),
+            req(
+                name="Servir Sustento de Justificación",
+                method="GET",
+                url="{{base_url}}/uploads/justificaciones/justif_8_1700000000.jpg",
+                desc="Descarga la foto del certificado médico o justificación laboral.",
+                auth_inherit=False
+            ),
+            req(
+                name="Servir Foto de Punto de Venta",
+                method="GET",
+                url="{{base_url}}/uploads/prospectos/pdv_20.jpg",
+                desc="Descarga la foto de fachada del punto de venta.",
                 auth_inherit=False
             )
         ]
