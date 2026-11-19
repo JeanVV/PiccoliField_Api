@@ -438,6 +438,8 @@ class FCMService:
 
         cls._ejecutar_en_segundo_plano(_job)
 
+
+
     # ─────────────────────────────────────────────────────────────────────────
     # 2. Nueva Incidencia: se envía a TODOS los promotores activos
     # ─────────────────────────────────────────────────────────────────────────
@@ -481,6 +483,8 @@ class FCMService:
                 print(f"[FCM] Error en job notificar_nueva_incidencia: {e}")
 
         cls._ejecutar_en_segundo_plano(_job)
+
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # 3. Incidencia Resuelta: se envía al impulsador que la reportó
@@ -535,6 +539,8 @@ class FCMService:
 
         cls._ejecutar_en_segundo_plano(_job)
 
+
+
     # ─────────────────────────────────────────────────────────────────────────
     # 4. Meta Alcanzada: se envía al impulsador al alcanzar o superar su meta
     # ─────────────────────────────────────────────────────────────────────────
@@ -566,6 +572,8 @@ class FCMService:
                 print(f"[FCM] Error en job notificar_meta_alcanzada: {e}")
 
         cls._ejecutar_en_segundo_plano(_job)
+
+
 
     # ─────────────────────────────────────────────────────────────────────────
     # 5. Reasignación de Local: se envía al impulsador cuando es reasignado
@@ -608,3 +616,19 @@ class FCMService:
                 print(f"[FCM] Error en job notificar_reasignacion_local: {e}")
 
         cls._ejecutar_en_segundo_plano(_job)
+
+
+def notificar(token=None, titulo=None, mensaje=None, data=None, **kwargs):
+    """
+    Función de compatibilidad global para notificar mediante FCM.
+    Acepta cualquier combinación de nombres de argumento: (token/device_token, titulo/title, mensaje/body, data).
+    """
+    tok = token or kwargs.get("device_token") or kwargs.get("token")
+    tit = titulo or kwargs.get("title") or kwargs.get("titulo") or "Notificación"
+    msg = mensaje or kwargs.get("body") or kwargs.get("mensaje") or ""
+    d = data if data is not None else kwargs.get("data")
+    ok, _ = FCMService.enviar_a_token(fcm_token=tok, titulo=tit, mensaje=msg, data=d)
+    return ok
+
+
+
