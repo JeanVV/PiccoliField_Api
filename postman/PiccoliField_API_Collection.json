@@ -1,0 +1,2323 @@
+{
+  "info": {
+    "_postman_id": "piccolifield-full-api-v2-updated",
+    "name": "PiccoliField API - Colección Completa (Actualizada)",
+    "description": "Colección completa y exhaustiva con el 100% de rutas y endpoints de PiccoliField API.\nIncluye Autenticación, Perfil, Notificaciones, Puntos de Venta, Pedidos, Catálogo, Operaciones de Impulsador, Asistencias, Justificaciones, Supervisión, Prospectos, FCM y Archivos Multimedia.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://piccolifield-api-smkc.onrender.com/api",
+      "type": "string",
+      "description": "URL base en Render. Para local usar: http://localhost:5000/api"
+    },
+    {
+      "key": "base_host",
+      "value": "https://piccolifield-api-smkc.onrender.com",
+      "type": "string",
+      "description": "Host raíz sin prefijo /api (para uploads y rutas directas)"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "Token JWT guardado automáticamente tras el Login"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Autenticación, Perfil y Notificaciones",
+      "description": "Login, perfil de usuario, tokens FCM, fotos de perfil y notificaciones push.",
+      "item": [
+        {
+          "name": "Login (Iniciar Sesión)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Inicia sesión con correo y contraseña. Guarda automáticamente el token JWT en las variables {{token}}.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"correo\": \"admin@piccolifield.com\",\n  \"password\": \"Password123!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.token) {",
+                  "    pm.collectionVariables.set('token', jsonData.data.token);",
+                  "    pm.environment.set('token', jsonData.data.token);",
+                  "    console.log('Token JWT guardado automáticamente en {{token}}');",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ver Mi Perfil",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/perfil",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil"
+              ]
+            },
+            "description": "Obtiene los datos completos del colaborador autenticado (nombres, rol, sede, correo, teléfono, foto, estado)."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Mi Foto de Perfil (Base64)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/perfil/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "foto"
+              ]
+            },
+            "description": "Actualiza la foto de perfil del usuario en sesión (formato Data URL base64 o ruta).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url_foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Mi Foto de Perfil (Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/perfil/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "foto"
+              ]
+            },
+            "description": "Devuelve la imagen física de la foto de perfil en streaming binario (JPEG/PNG)."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de un Usuario por ID (Admin / Web)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuarios/8/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios",
+                "8",
+                "foto"
+              ]
+            },
+            "description": "Permite al administrador actualizar la foto de perfil de cualquier usuario en la base de datos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url_foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Foto de un Usuario por ID (Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/usuarios/8/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios",
+                "8",
+                "foto"
+              ]
+            },
+            "description": "Retorna el archivo de imagen de perfil del usuario especificado por su idUsuario."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar FCM Token de Mi Perfil (Push)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/perfil/fcm-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "fcm-token"
+              ]
+            },
+            "description": "Registra o actualiza el token de Firebase Cloud Messaging (FCM) del dispositivo móvil para recibir notificaciones push.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm_token_generado_en_el_dispositivo_movil_firebase_123456\",\n  \"dispositivo_info\": \"Samsung Galaxy A54 (Android 14)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar FCM Token (Ruta /api/usuario/fcm-token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuario/fcm-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuario",
+                "fcm-token"
+              ]
+            },
+            "description": "Ruta alias para registro de token FCM desde la aplicación móvil.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm_token_generado_en_el_dispositivo_movil_firebase_123456\",\n  \"dispositivo_info\": \"Xiaomi Redmi Note 12\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Notificaciones Recibidas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notificaciones?limite=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notificaciones?limite=20"
+              ]
+            },
+            "description": "Lista el historial de notificaciones push enviadas y recibidas por el usuario logueado."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Notificaciones (Alias /api/perfil/notificaciones)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/perfil/notificaciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "notificaciones"
+              ]
+            },
+            "description": "Ruta alternativa para consultar el historial de notificaciones del perfil."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Puntos de Venta y Distribución",
+      "description": "Gestión de puntos de venta (tipo VENTA o DISTRIBUCIÓN), asignación de promotores/responsables e historial.",
+      "item": [
+        {
+          "name": "Listar Puntos de Venta (Con Filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta?tipo=DISTRIBUCION&estado=ACTIVO",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta?tipo=DISTRIBUCION&estado=ACTIVO"
+              ]
+            },
+            "description": "Lista todos los puntos de venta. Soporta parámetros opcionales: ?tipo=DISTRIBUCION / VENTA y ?estado=ACTIVO / INACTIVO."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de un Punto de Venta por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20"
+              ]
+            },
+            "description": "Obtiene los datos detallados de un punto de venta (código, nombre, dirección, geocerca, promotor asignado, tipo y estado)."
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Responsable / Promotor a Punto de Venta (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/responsable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "responsable"
+              ]
+            },
+            "description": "Asigna un promotor o vendedor responsable al punto de venta y registra el cambio en HISTORIAL_ASIGNACIONES.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Asignación de zona comercial norte\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asignaciones del Punto de Venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/historial",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "historial"
+              ]
+            },
+            "description": "Lista el histórico de todos los promotores/vendedores que han sido asignados al punto de venta."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Pedidos y Despacho",
+      "description": "Registro de pedidos para puntos de distribución, listados y transiciones de estado (Despacho).",
+      "item": [
+        {
+          "name": "Listar Todos los Pedidos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos?estado=REGISTRADO&tipo=DISTRIBUCION",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos?estado=REGISTRADO&tipo=DISTRIBUCION"
+              ]
+            },
+            "description": "Lista los pedidos. Administrador ve todos; Promotor ve los de sus PDVs asignados. Filtros: ?estado=REGISTRADO, EN_PREPARACION, ENTREGADO, CANCELADO y ?idPuntosVenta=20."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de un Pedido por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/pedidos/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "1"
+              ]
+            },
+            "description": "Devuelve la información detallada del pedido, datos del punto de venta y del producto solicitado."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Pedido (Ruta Directa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Operation-Id",
+                "value": "op-pedido-uuid-12345",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "Registra un nuevo pedido para un punto de distribución. Soporta idempotencia mediante header X-Operation-Id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 20,\n  \"idProductos\": 1,\n  \"cantSolicitada\": 5\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Pedido (Ruta Anidada /puntos-venta/:id/pedidos)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "pedidos"
+              ]
+            },
+            "description": "Registra un pedido vinculando el idPuntosVenta desde la URL (ideal para app Android móvil).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idProductos\": 1,\n  \"cantSolicitada\": 3\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Pedidos de un Punto Específico",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/pedidos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "pedidos"
+              ]
+            },
+            "description": "Obtiene todos los pedidos asociados al punto de venta especificado en la ruta."
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Estado del Pedido (Despacho - Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Cambia el estado del pedido: REGISTRADO -> EN_PREPARACION -> ENTREGADO (o CANCELADO). Solo para Administrador.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"EN_PREPARACION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Estado a ENTREGADO (Despacho)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/pedidos/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "pedidos",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Marca el pedido como ENTREGADO una vez despachado y entregado al punto de distribución.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ENTREGADO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Catálogo de Productos",
+      "description": "Catálogo general de licores y macerados de Piccoli.",
+      "item": [
+        {
+          "name": "Listar Catálogo de Productos Activos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos"
+              ]
+            },
+            "description": "Obtiene la lista de productos activos de la empresa con SKU, EAN, precios y categoría."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Producto por Código EAN o SKU",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/ean/7751234567890",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos",
+                "ean",
+                "7751234567890"
+              ]
+            },
+            "description": "Busca un producto por su código de barras EAN o su código SKU único."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Producto por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos",
+                "1"
+              ]
+            },
+            "description": "Devuelve la ficha técnica completa del producto especificado por su idProductos."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Impulsador (Operaciones en Campo e Incidencias)",
+      "description": "Dashboard, ventas con lector de barras, reposición de stock, incidencias y catálogo del local asignado.",
+      "item": [
+        {
+          "name": "Dashboard del Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "dashboard"
+              ]
+            },
+            "description": "Resumen de asignación activa, ventas del día, meta diaria y puntos clave del local asignado."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asignaciones del Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/historial",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "historial"
+              ]
+            },
+            "description": "Histórico de locales y puntos de venta donde ha trabajado el impulsador autenticado."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de Productos en el Local Asignado",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/productos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "productos"
+              ]
+            },
+            "description": "Lista de productos y su disponibilidad de stock en el punto de venta donde labora el impulsador."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Producto por Código de Barras (Query ?codigo=)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/productos/buscar?codigo=7751234567890",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "productos",
+                "buscar?codigo=7751234567890"
+              ]
+            },
+            "description": "Busca el producto mediante lector de código de barras para venta o reposición rápida."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Producto por Código de Barras (Path /codigo/:barras)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/productos/codigo/7751234567890",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "productos",
+                "codigo",
+                "7751234567890"
+              ]
+            },
+            "description": "Ruta alternativa por path param para el lector de código de barras de la app Android."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Venta por Código de Barras",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/impulsador/ventas/registrar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "ventas",
+                "registrar"
+              ]
+            },
+            "description": "Registra la venta de botellas en el local asignado y descuenta automáticamente el stock en góndola/almacén.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigo_barras\": \"7751234567890\",\n  \"cantidad\": 2,\n  \"idPuntosVenta\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reponer Stock de Producto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/impulsador/stock/reponer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "stock",
+                "reponer"
+              ]
+            },
+            "description": "Actualiza las unidades en exhibición y almacén del producto en el punto de venta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idProductos\": 1,\n  \"cantExhibida\": 15,\n  \"cantAlmacen\": 30,\n  \"idPuntosVenta\": 1,\n  \"observacion\": \"Reposición matutina de anaqueles\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reponer Stock (Alias /productos/reponer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/impulsador/productos/reponer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "productos",
+                "reponer"
+              ]
+            },
+            "description": "Ruta alias para reposición de stock en góndola.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idProductos\": 1,\n  \"cantExhibida\": 10,\n  \"cantAlmacen\": 20,\n  \"idPuntosVenta\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Tipos de Incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias/tipos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "tipos"
+              ]
+            },
+            "description": "Obtiene los tipos de incidencia permitidos en el sistema (STOCK, EXHIBICION, ROTURA, COMPETENCIA, etc.)."
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar Incidencia en Local",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            },
+            "description": "Registra una incidencia detectada en el punto de venta con nivel de severidad y sustento.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo\": \"ROTURA\",\n  \"descripcion\": \"Se quebró una botella de licor de cacao en el pasillo central\",\n  \"severidad\": \"MEDIA\",\n  \"idPuntosVenta\": 1,\n  \"foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Incidencias Reportadas por el Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias?estado=PENDIENTE",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias?estado=PENDIENTE"
+              ]
+            },
+            "description": "Lista las incidencias registradas por el impulsador autenticado. Filtro opcional: ?estado=PENDIENTE/RESUELTO."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Incidencia Reportada",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "1"
+              ]
+            },
+            "description": "Obtiene el detalle completo de una incidencia (fecha, estado, solución y comentarios de supervisión)."
+          },
+          "response": []
+        },
+        {
+          "name": "Descargar / Ver Foto de Incidencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Devuelve la imagen física adjunta a la incidencia reportada."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "5. Asistencias y Justificaciones",
+      "description": "Marcación de asistencias (Ingreso/Salida), justificaciones, revisión y disparo de resumen diario (10:30 AM).",
+      "item": [
+        {
+          "name": "Resumen General de Asistencias del Día",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/resumen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "resumen"
+              ]
+            },
+            "description": "Métricas en tiempo real de colaboradores presentes, a tiempo, tardanzas y faltas."
+          },
+          "response": []
+        },
+        {
+          "name": "Asistencias Recientes del Día",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/recientes?limite=15",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "recientes?limite=15"
+              ]
+            },
+            "description": "Últimas marcas de asistencia registradas hoy en tiempo real."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Colaboradores y su Asistencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/colaboradores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "colaboradores"
+              ]
+            },
+            "description": "Lista de todo el personal y su estado de asistencia de la jornada actual."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Colaboradores (Ruta raíz /colaboradores)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/colaboradores",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "colaboradores"
+              ]
+            },
+            "description": "Ruta directa de compatibilidad para consultar colaboradores."
+          },
+          "response": []
+        },
+        {
+          "name": "Última Asistencia del Usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/ultima?idUsuario=8",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "ultima?idUsuario=8"
+              ]
+            },
+            "description": "Devuelve el último registro de asistencia de un colaborador para validar si ya marcó ingreso o salida."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asistencias por Colaborador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/historial/8",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "historial",
+                "8"
+              ]
+            },
+            "description": "Histórico detallado de todas las marcas de asistencia del colaborador indicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Asistencia (Ingreso o Salida)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/asistencias/marcar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "marcar"
+              ]
+            },
+            "description": "Registra la marca de INGRESO o SALIDA del colaborador. Calcula automáticamente tardanza según la hora oficial.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"tipo\": \"INGRESO\",\n  \"latitud\": -6.771198,\n  \"longitud\": -79.838557,\n  \"direccion\": \"Av. Balta 123, Chiclayo\",\n  \"sede\": \"Chiclayo Central\",\n  \"fechaHoraDispositivo\": \"2026-11-19 09:15:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Asistencia (Ruta directa /marcar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_host}}/marcar",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "marcar"
+              ]
+            },
+            "description": "Ruta directa alternativa utilizada por clientes móviles para registrar asistencia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"tipo\": \"INGRESO\",\n  \"latitud\": -6.771198,\n  \"longitud\": -79.838557\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Justificación de Inasistencia / Tardanza",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/asistencias/justificar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "justificar"
+              ]
+            },
+            "description": "Envía una justificación de falta o tardanza con motivo, descripción y foto de sustento médica/laboral.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"SALUD\",\n  \"descripcion\": \"Cita médica por descanso de 24 horas\",\n  \"fecha\": \"2026-11-19\",\n  \"fotoSustentoBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Justificación (Ruta directa /justificar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_host}}/justificar",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "justificar"
+              ]
+            },
+            "description": "Ruta directa alternativa para enviar justificación desde la app.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"TRAFICO\",\n  \"descripcion\": \"Cierre de vías por mantenimiento\",\n  \"fecha\": \"2026-11-19\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Ver Justificaciones de un Usuario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/justificacion/8",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "justificacion",
+                "8"
+              ]
+            },
+            "description": "Consulta la última o todas las justificaciones enviadas por un colaborador y su estado (PENDIENTE, APROBADA, RECHAZADA)."
+          },
+          "response": []
+        },
+        {
+          "name": "Revisar Justificación (Aprobar / Rechazar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/asistencias/justificacion/revisar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "justificacion",
+                "revisar"
+              ]
+            },
+            "description": "El Administrador o Supervisor aprueba o rechaza la justificación. Al aprobar, el estado de la asistencia cambia a A_TIEMPO.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"idAsistencia\": 15,\n  \"idRevisor\": 1,\n  \"estado\": \"APROBADA\",\n  \"comentario\": \"Descanso médico válido presentado a tiempo\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Disparar Notificación de Resumen Diario (10:30 AM / Manual)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/notificar-resumen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "notificar-resumen"
+              ]
+            },
+            "description": "Ejecuta manualmente el resumen diario de asistencias y envía las notificaciones push a los Administradores y Supervisores.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "6. Supervisión y Control",
+      "description": "Gestión de personal de campo, puntos de venta, alertas de stock, atención de incidencias y reasignaciones.",
+      "item": [
+        {
+          "name": "Resumen General de Supervisión (Dashboard)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/resumen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "resumen"
+              ]
+            },
+            "description": "Métricas globales para el supervisor: total de personal activo, puntos cubiertos, alertas pendientes e incidencias del día."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Mejores Vendedores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores"
+              ]
+            },
+            "description": "Ranking de vendedores por volumen de ventas y cumplimiento de metas comerciales."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Vendedor por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores/8",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8"
+              ]
+            },
+            "description": "Ficha completa del vendedor, local actual asignado y resumen de rendimiento."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asignaciones de Vendedor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores/8/historial-asignaciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "historial-asignaciones"
+              ]
+            },
+            "description": "Locales y puntos de venta donde ha sido asignado el colaborador históricamente."
+          },
+          "response": []
+        },
+        {
+          "name": "Rendimiento Histórico de Vendedor",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores/8/rendimiento-historico?anio=2026",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "rendimiento-historico?anio=2026"
+              ]
+            },
+            "description": "Ventas mensuales acumuladas a lo largo del año para análisis de desempeño."
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Vendedor a Punto de Venta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Cambia el local asignado de un vendedor e inserta registro en HISTORIAL_ASIGNACIONES.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Refuerzo comercial por campaña navideña\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Todos los Impulsadores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores"
+              ]
+            },
+            "description": "Lista de impulsadores con sus locales asignados y estado actual."
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "foto"
+              ]
+            },
+            "description": "Devuelve la foto del impulsador para visualización en el panel de supervisión."
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Personal (Ruta Genérica /personal/:id/reasignar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/personal/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "personal",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Ruta unificada para reasignar cualquier tipo de personal de campo a un nuevo punto de venta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 3,\n  \"motivo\": \"Reubicación estratégica de zona\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador (Ruta Directa por Body)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/reasignar-impulsador",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "reasignar-impulsador"
+              ]
+            },
+            "description": "Reasignación enviando tanto el idPuntosVenta como el idUsuario en el cuerpo JSON.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"idUsuario\": 8,\n  \"motivo\": \"Rotación programada de personal\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Puntos de Venta (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta?estado=ACTIVO",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta?estado=ACTIVO"
+              ]
+            },
+            "description": "Lista todos los locales comerciales con su impulsador asignado, stock y estado."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Punto de Venta (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1"
+              ]
+            },
+            "description": "Ficha completa del punto de venta con dirección, coordenadas y responsable."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Impulsadores en Punto de Venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/historial",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "historial"
+              ]
+            },
+            "description": "Lista de todos los colaboradores que han estado a cargo del punto de venta."
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador desde el Punto de Venta",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "reasignar"
+              ]
+            },
+            "description": "Asigna un nuevo impulsador al punto de venta especificado en la URL.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Cubrir descanso médico del titular\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Stock de Productos en Punto de Venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/stock",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "stock"
+              ]
+            },
+            "description": "Stock actual en góndola y almacén de todos los productos en el local seleccionado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Alertas de Stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas"
+              ]
+            },
+            "description": "Lista alertas generadas cuando el stock cae por debajo del nivel mínimo (PENDIENTE / ATENDIDA / IGNORADA)."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Alerta de Stock",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1"
+              ]
+            },
+            "description": "Detalle del producto en desabastecimiento, punto de venta y fecha de la alerta."
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar Estado de Alerta (Atender / Ignorar)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Actualiza el estado de la alerta de stock con un comentario explicativo.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ATENDIDA\",\n  \"comentario\": \"Se despachó pedido de emergencia de 24 unidades\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Alerta como Atendida",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/atender",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "atender"
+              ]
+            },
+            "description": "Acceso directo para marcar la alerta como resuelta/atendida.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Stock repuesto en tienda satisfactoriamente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Alerta como Ignorada",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/ignorar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "ignorar"
+              ]
+            },
+            "description": "Ignora la alerta (por ejemplo, si el producto se retiró de exhibición deliberadamente).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Local en inventario general\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Incidencias (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/incidencias?estado=PENDIENTE&severidad=ALTA",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias?estado=PENDIENTE&severidad=ALTA"
+              ]
+            },
+            "description": "Bandeja de incidencias reportadas en campo para gestión y resolución por supervisión."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Incidencia (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/incidencias/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1"
+              ]
+            },
+            "description": "Información completa de la incidencia y fecha de reporte."
+          },
+          "response": []
+        },
+        {
+          "name": "Atender / Resolver Incidencia",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/incidencias/1/atender",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1",
+                "atender"
+              ]
+            },
+            "description": "El supervisor da por atendida o resuelta la incidencia registrando la solución aplicada.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"RESUELTO\",\n  \"comentario\": \"Se coordinó con el área logística la reposición del material dañado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de Incidencia (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/incidencias/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Descarga la imagen de sustento de la incidencia para auditoría."
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de Producto en Supervisión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/productos/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "productos",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Descarga o visualiza la fotografía oficial del producto."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Prospectos (Puntos Potenciales)",
+      "description": "Registro de clientes potenciales, pipeline de negociación, conversión automática a Punto de Venta (Distribución) y seguimientos.",
+      "item": [
+        {
+          "name": "Listar Prospectos (Con Filtros)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos?estado=NUEVO&potencial=ALTO",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos?estado=NUEVO&potencial=ALTO"
+              ]
+            },
+            "description": "Lista prospectos. Filtros: ?estado=NUEVO, EN_NEGOCIACION, CONVERTIDO, DESCARTADO y ?potencial=ALTO, MEDIO, BAJO."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de Prospecto por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1"
+              ]
+            },
+            "description": "Obtiene los datos completos del prospecto junto con todo su historial de seguimientos comerciales."
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Nuevo Prospecto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos"
+              ]
+            },
+            "description": "Registra un nuevo prospecto comercial en la base de datos.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre_comercial\": \"Licorería El Parral\",\n  \"tipo_local\": \"Licorería\",\n  \"direccion\": \"Av. Bolognesi 450\",\n  \"contacto\": \"Juan Pérez\",\n  \"telefono\": \"978123456\",\n  \"potencial\": \"ALTO\",\n  \"estado\": \"NUEVO\",\n  \"latitud\": -6.7725,\n  \"longitud\": -79.8402,\n  \"idDistrito\": 1,\n  \"notas\": \"Interesado en cócteles de crema para temporada de verano\",\n  \"url_foto\": \"uploads/prospectos/prospecto_parral.jpg\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Datos de Prospecto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1"
+              ]
+            },
+            "description": "Modifica datos de contacto, dirección, notas o potencial del prospecto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contacto\": \"Juan Pérez Gómez\",\n  \"telefono\": \"978654321\",\n  \"potencial\": \"ALTO\",\n  \"notas\": \"Se acordó segunda visita comercial con degustación\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar Estado de Prospecto (Al CONVERTIR -> Crea Punto de Venta)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Actualiza el estado: NUEVO, EN_NEGOCIACION, CONVERTIDO o DESCARTADO. Si se envía CONVERTIDO, la API crea automáticamente un registro en PUNTOS_VENTA con tipo DISTRIBUCIÓN.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"CONVERTIDO\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Descartar Prospecto (Con Motivo)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Pasa el estado a DESCARTADO especificando el motivo del descarte.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"DESCARTADO\",\n  \"motivo_descarte\": \"Volumen de compra muy bajo para venta mayorista\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Promotor a Prospecto",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/asignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "asignar"
+              ]
+            },
+            "description": "Asigna el promotor responsable de cerrar la negociación con el prospecto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Seguimiento Comercial (Visita / Llamada)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/seguimientos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "seguimientos"
+              ]
+            },
+            "description": "Registra una acción de seguimiento comercial realizada sobre el prospecto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipo_contacto\": \"VISITA\",\n  \"observacion\": \"Se entregaron muestras de Licor de Jamaica y lista de precios mayorista\",\n  \"acuerdos\": \"El dueño responderá el día viernes para el primer pedido\",\n  \"proximo_contacto\": \"2026-11-22 10:00:00\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Seguimientos de un Prospecto",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/seguimientos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "seguimientos"
+              ]
+            },
+            "description": "Obtiene la cronología completa de visitas, llamadas y acuerdos realizados con el prospecto."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "8. Dispositivo y Notificaciones Push",
+      "description": "Registro de dispositivo físico para geolocalización, sincronización y notificaciones push FCM.",
+      "item": [
+        {
+          "name": "Actualizar Dispositivo del Usuario",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/dispositivo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "dispositivo"
+              ]
+            },
+            "description": "Registra el identificador único del hardware, modelo y token FCM del usuario.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id_dispositivo\": \"android_hardware_device_uuid_987654\",\n  \"modelo\": \"Samsung Galaxy S23 Ultra\",\n  \"sistema_operativo\": \"Android 14\",\n  \"fcm_token\": \"fcm_token_valido_de_firebase_cloud_messaging\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "9. Archivos y Multimedia (Uploads)",
+      "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas.",
+      "item": [
+        {
+          "name": "Servir Archivo / Foto Subida",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/uploads/perfiles/user_8.jpg",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "uploads",
+                "perfiles",
+                "user_8.jpg"
+              ]
+            },
+            "description": "Sirve directamente el archivo físico alojado en la carpeta uploads/ (fotos de perfil, incidencias, prospectos).",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
