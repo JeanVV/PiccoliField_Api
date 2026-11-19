@@ -4,3 +4,4 @@ __pycache__/
 .env
 firebase/
 *.json
+!firebase/piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json

@@ -53,38 +53,44 @@ class FCMService:
     def _obtener_ruta_credenciales(cls):
         """
         Retorna la ruta absoluta al archivo de credenciales de Firebase Admin SDK.
-        Construye la ruta a partir de la ubicación de fcm_service.py.
+        Busca en orden:
+        1. '/etc/secrets/piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json' (Secret Files en Render)
+        2. os.path.join(os.path.dirname(__file__), '..', 'firebase', 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json')
+        3. 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'
         """
-        ruta_directa = os.path.abspath(
-            os.path.join(
-                os.path.dirname(__file__),
-                "..",
-                "firebase",
-                "piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json",
-            )
-        )
-        print(f"[FCM] Buscando archivo de credenciales en: {ruta_directa}")
+        nombre_archivo = cls.NOMBRE_ARCHIVO_CREDENCIAL
+        rutas_candidatas = [
+            # 1. Ruta por defecto de Secret Files en Render
+            f"/etc/secrets/{nombre_archivo}",
+            # 2. os.path.join(os.path.dirname(__file__), '..', 'firebase', '...')
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "firebase", nombre_archivo)),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), nombre_archivo)),
+            # 3. 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'
+            nombre_archivo,
+            os.path.abspath(nombre_archivo),
+            os.path.abspath(os.path.join(os.getcwd(), "firebase", nombre_archivo)),
+        ]
 
-        if os.path.isfile(ruta_directa):
-            print(f"[FCM] Archivo de credenciales encontrado correctamente: {ruta_directa}")
-            return ruta_directa
-
-        print(f"[FCM] ADVERTENCIA: El archivo no existe en la ruta: {ruta_directa}")
-
-        # Fallback a variable de entorno si estuviera definida
+        # Variable de entorno si estuviera definida
         env_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-        if env_path and os.path.isfile(env_path):
-            print(f"[FCM] Utilizando credenciales desde variable de entorno: {env_path}")
-            return env_path
+        if env_path:
+            rutas_candidatas.append(env_path)
+
+        for ruta in rutas_candidatas:
+            if os.path.isfile(ruta):
+                print(f"[FCM] Archivo de credenciales encontrado correctamente: {ruta}")
+                return ruta
 
         # Fallback a cualquier otro .json en la carpeta firebase/
         firebase_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "firebase"))
-        for f in glob.glob(os.path.join(firebase_dir, "*.json")):
-            if os.path.basename(f).lower() == "google-services.json":
-                continue
-            print(f"[FCM] Utilizando archivo JSON alternativo encontrado en: {f}")
-            return f
+        if os.path.isdir(firebase_dir):
+            for f in glob.glob(os.path.join(firebase_dir, "*.json")):
+                if os.path.basename(f).lower() == "google-services.json":
+                    continue
+                print(f"[FCM] Utilizando archivo JSON alternativo encontrado en: {f}")
+                return f
 
+        print(f"[FCM] ADVERTENCIA: No se encontró el archivo de credenciales {nombre_archivo} en ninguna de las rutas esperadas.")
         return None
 
     @classmethod

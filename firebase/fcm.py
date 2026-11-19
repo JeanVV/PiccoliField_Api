@@ -16,12 +16,29 @@ except ImportError:
 
 
 def _obtener_ruta_credenciales():
-    SERVICE_ACCOUNT_FILE = 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'
-    service_account_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), SERVICE_ACCOUNT_FILE)
-    if not os.path.isfile(service_account_path):
-        service_account_path = os.path.join(os.getcwd(), "firebase", SERVICE_ACCOUNT_FILE)
-    if os.path.isfile(service_account_path):
-        return service_account_path
+    NOMBRE_ARCHIVO = 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'
+    rutas_candidatas = [
+        # 1. Ruta por defecto de Secret Files en Render
+        f'/etc/secrets/{NOMBRE_ARCHIVO}',
+        # 2. os.path.join(os.path.dirname(__file__), '..', 'firebase', '...') y local
+        os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'firebase', NOMBRE_ARCHIVO)),
+        os.path.abspath(os.path.join(os.path.dirname(__file__), NOMBRE_ARCHIVO)),
+        # 3. 'piccolifield-firebase-adminsdk-fbsvc-8b6481d9e4.json'
+        NOMBRE_ARCHIVO,
+        os.path.abspath(NOMBRE_ARCHIVO),
+        os.path.abspath(os.path.join(os.getcwd(), 'firebase', NOMBRE_ARCHIVO)),
+    ]
+
+    env_path = os.getenv("FIREBASE_CREDENTIALS_PATH") or os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+    if env_path:
+        rutas_candidatas.append(env_path)
+
+    for ruta in rutas_candidatas:
+        if os.path.isfile(ruta):
+            print(f"[FCM] Archivo de credenciales encontrado en: {ruta}")
+            return ruta
+
+    print(f"[FCM] ADVERTENCIA: No se encontró el archivo {NOMBRE_ARCHIVO} en ninguna de las rutas esperadas.")
     return None
 
 
