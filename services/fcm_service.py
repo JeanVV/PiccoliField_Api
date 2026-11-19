@@ -230,14 +230,23 @@ class FCMService:
     def enviar_a_token(cls, fcm_token, titulo, mensaje, data=None):
         """
         Envía un mensaje push directo a un token FCM.
-        Prioriza el uso de Firebase Admin SDK con credentials.Certificate y messaging.send().
-        Si firebase-admin no está disponible o falla, utiliza la API HTTP v1 con OAuth2.
+        Prioriza el uso de firebase/fcm.py (el método comprobado y funcional del proyecto).
+        Si falla, utiliza Firebase Admin SDK o HTTP v1 como respaldo.
         """
         if not fcm_token:
             return False, "Token vacío"
 
         # Todos los valores del diccionario data deben ser strings
         data_strings = {str(k): str(v) for k, v in (data or {}).items()}
+
+        # ── 0. Intento prioritario con firebase/fcm.py (Idéntico a Justificación) ──
+        try:
+            from firebase.fcm import notificar
+            ok_fb = notificar(device_token=fcm_token, title=titulo, body=mensaje, data=data_strings)
+            if ok_fb:
+                return True, "Enviado con éxito (firebase/fcm)"
+        except Exception as e_direct:
+            print(f"[FCM] firebase.fcm.notificar falló ({e_direct}), probando métodos secundarios...")
 
         # ── 1. Intento con Firebase Admin SDK (credentials.Certificate) ──
         if firebase_admin is not None and messaging is not None:
@@ -330,14 +339,14 @@ class FCMService:
     @classmethod
     def obtener_promotores_activos(cls):
         """
-        Retorna la lista de idUsuario de todos los usuarios con rol PROMOTOR activos.
+        Retorna la lista de idUsuario de todos los usuarios con rol PROMOTOR, SUPERVISOR o ADMINISTRADOR activos.
         """
         conn = get_connection()
         try:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT idUsuario FROM USUARIOS 
-                WHERE rol = 'PROMOTOR' AND estado = 'ACTIVO'
+                WHERE rol IN ('PROMOTOR', 'ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') AND estado = 'ACTIVO'
             """)
             rows = cursor.fetchall() or []
             return [r["idUsuario"] for r in rows if r.get("idUsuario")]
@@ -410,7 +419,6 @@ class FCMService:
                 # Obtener nombre del producto
                 cursor.execute("SELECT producto FROM PRODUCTOS WHERE idProductos = %s LIMIT 1", (idProductos,))
                 prod = cursor.fetchone()
-                conn.close()
 
                 nombre_pdv = pdv.get("puntoVenta", "Local") if pdv else "Local"
                 nombre_producto = prod.get("producto", "Producto") if prod else "Producto"
@@ -421,6 +429,7 @@ class FCMService:
                 # Payload con "tipo" e "id" para redirección en la app móvil
                 data = {
                     "tipo": "ALERTA",
+                    "pantalla": "ALERTA",
                     "id": str(idAlerta if idAlerta else idPuntosVenta),
                     "idAlerta": str(idAlerta or ""),
                     "idPuntosVenta": str(idPuntosVenta),
@@ -429,25 +438,68 @@ class FCMService:
                     "stock_minimo": str(stock_minimo)
                 }
 
-                promotores = cls.obtener_promotores_activos()
-                for idPromotor in promotores:
-                    cls.notificar_usuario(
-                        idUsuario=idPromotor,
-                        titulo=titulo,
-                        mensaje=mensaje,
-                        data=data,
-                        tipo="ALERTA_STOCK",
-                        referencia=f"ALERTA-{idAlerta}" if idAlerta else f"PDV-{idPuntosVenta}"
-                    )
+                # 1. Obtener tokens activos de promotores, administradores y supervisores (idéntico a justificación)
+                sql = """
+                    SELECT ud.fcm_token, ud.idUsuario 
+                    FROM USUARIO_DISPOSITIVO ud
+                    JOIN USUARIOS u ON ud.idUsuario = u.idUsuario
+                    WHERE u.rol IN ('PROMOTOR', 'ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                      AND ud.activo = 1 
+                      AND ud.fcm_token IS NOT NULL 
+                      AND ud.fcm_token != ''
+                """
+                cursor.execute(sql)
+                rows = cursor.fetchall() or []
+                tokens_dict = {}
+                for r in rows:
+                    tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                    u_id = r.get("idUsuario") if isinstance(r, dict) else (r[1] if len(r) > 1 else None)
+                    if tok and str(tok).strip() and str(tok).strip() not in tokens_dict:
+                        tokens_dict[str(tok).strip()] = u_id
+
+                # Fallback complementario desde USUARIOS.fcm_token
+                try:
+                    cursor.execute("""
+                        SELECT fcm_token, idUsuario FROM USUARIOS 
+                        WHERE rol IN ('PROMOTOR', 'ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                          AND fcm_token IS NOT NULL 
+                          AND fcm_token != ''
+                    """)
+                    for r in cursor.fetchall() or []:
+                        tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                        u_id = r.get("idUsuario") if isinstance(r, dict) else (r[1] if len(r) > 1 else None)
+                        if tok and str(tok).strip() and str(tok).strip() not in tokens_dict:
+                            tokens_dict[str(tok).strip()] = u_id
+                except Exception:
+                    pass
+
+                conn.close()
+
+                if not tokens_dict:
+                    print("[FCM Alerta Stock] No se encontraron tokens FCM activos.")
+                    return
+
+                # 2. Enviar a cada token único usando firebase.fcm.notificar (idéntico a justificación)
+                from firebase.fcm import notificar
+                for token, u_id in tokens_dict.items():
+                    try:
+                        ok = notificar(device_token=token, title=titulo, body=mensaje, data=data)
+                        print(f"[FCM Alerta Stock]: Enviado a {token[:20]}... (Resultado: {ok})")
+                        if u_id:
+                            try:
+                                cls._guardar_log(u_id, "ALERTA_STOCK", f"ALERTA-{idAlerta}" if idAlerta else f"PDV-{idPuntosVenta}", mensaje, "Enviado con éxito" if ok else "Fallo al enviar")
+                            except Exception:
+                                pass
+                    except Exception as e_send:
+                        print(f"[FCM Alerta Stock ERROR]: Error al enviar push a token {token[:20]}...: {e_send}")
+
             except Exception as e:
                 print(f"[FCM] Error en job notificar_alerta_stock: {e}")
 
         cls._ejecutar_en_segundo_plano(_job)
 
-
-
     # ─────────────────────────────────────────────────────────────────────────
-    # 2. Nueva Incidencia: se envía a TODOS los promotores activos
+    # 2. Nueva Incidencia: se envía a TODOS los promotores y supervisores activos
     # ─────────────────────────────────────────────────────────────────────────
     @classmethod
     def notificar_nueva_incidencia(cls, idPuntosVenta, tipo_incidencia, severidad, descripcion, idIncidencias=None, idUsuarioReporta=None):
@@ -457,7 +509,6 @@ class FCMService:
                 cursor = conn.cursor()
                 cursor.execute("SELECT puntoVenta FROM PUNTOS_VENTA WHERE idPuntosVenta = %s LIMIT 1", (idPuntosVenta,))
                 pdv = cursor.fetchone()
-                conn.close()
 
                 nombre_pdv = pdv.get("puntoVenta", "Local") if pdv else "Local"
 
@@ -468,6 +519,7 @@ class FCMService:
                 # Payload con "tipo" e "id" para redirección en la app móvil
                 data = {
                     "tipo": "INCIDENCIA",
+                    "pantalla": "INCIDENCIA",
                     "id": str(idIncidencias or ""),
                     "idIncidencias": str(idIncidencias or ""),
                     "idPuntosVenta": str(idPuntosVenta),
@@ -475,16 +527,54 @@ class FCMService:
                     "tipo_incidencia": str(tipo_incidencia)
                 }
 
-                promotores = cls.obtener_promotores_activos()
-                for idPromotor in promotores:
-                    cls.notificar_usuario(
-                        idUsuario=idPromotor,
-                        titulo=titulo,
-                        mensaje=mensaje,
-                        data=data,
-                        tipo="INCIDENCIA_NUEVA",
-                        referencia=f"INC-{idIncidencias}" if idIncidencias else f"PDV-{idPuntosVenta}"
-                    )
+                sql = """
+                    SELECT ud.fcm_token, ud.idUsuario 
+                    FROM USUARIO_DISPOSITIVO ud
+                    JOIN USUARIOS u ON ud.idUsuario = u.idUsuario
+                    WHERE u.rol IN ('PROMOTOR', 'ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                      AND ud.activo = 1 
+                      AND ud.fcm_token IS NOT NULL 
+                      AND ud.fcm_token != ''
+                """
+                cursor.execute(sql)
+                rows = cursor.fetchall() or []
+                tokens_dict = {}
+                for r in rows:
+                    tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                    u_id = r.get("idUsuario") if isinstance(r, dict) else (r[1] if len(r) > 1 else None)
+                    if tok and str(tok).strip() and str(tok).strip() not in tokens_dict:
+                        tokens_dict[str(tok).strip()] = u_id
+
+                try:
+                    cursor.execute("""
+                        SELECT fcm_token, idUsuario FROM USUARIOS 
+                        WHERE rol IN ('PROMOTOR', 'ADMINISTRADOR', 'ADMIN', 'SUPERVISOR') 
+                          AND fcm_token IS NOT NULL 
+                          AND fcm_token != ''
+                    """)
+                    for r in cursor.fetchall() or []:
+                        tok = r.get("fcm_token") if isinstance(r, dict) else r[0]
+                        u_id = r.get("idUsuario") if isinstance(r, dict) else (r[1] if len(r) > 1 else None)
+                        if tok and str(tok).strip() and str(tok).strip() not in tokens_dict:
+                            tokens_dict[str(tok).strip()] = u_id
+                except Exception:
+                    pass
+
+                conn.close()
+
+                from firebase.fcm import notificar
+                for token, u_id in tokens_dict.items():
+                    try:
+                        ok = notificar(device_token=token, title=titulo, body=mensaje, data=data)
+                        print(f"[FCM Incidencia]: Enviado a {token[:20]}... (Resultado: {ok})")
+                        if u_id:
+                            try:
+                                cls._guardar_log(u_id, "INCIDENCIA_NUEVA", f"INC-{idIncidencias}" if idIncidencias else f"PDV-{idPuntosVenta}", mensaje, "Enviado con éxito" if ok else "Fallo al enviar")
+                            except Exception:
+                                pass
+                    except Exception as e_send:
+                        print(f"[FCM Incidencia ERROR]: Error al enviar push a token {token[:20]}...: {e_send}")
+
             except Exception as e:
                 print(f"[FCM] Error en job notificar_nueva_incidencia: {e}")
 
