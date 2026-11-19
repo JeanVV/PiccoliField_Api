@@ -552,6 +552,31 @@ class AsistenciaService:
         finally:
             connection.close()
 
+    # ── SEDES DE LA EMPRESA ──────────────────────────────────────────────────
+    def obtener_sedes(self):
+        connection = get_connection()
+        try:
+            repository = AsistenciaRepository(connection)
+            sedes = repository.obtener_sedes()
+            return sedes, "Sedes obtenidas correctamente", 200
+        except Exception as e:
+            return None, f"Error al obtener sedes: {str(e)}", 500
+        finally:
+            connection.close()
+
+    def obtener_sede_por_id(self, id_sede):
+        connection = get_connection()
+        try:
+            repository = AsistenciaRepository(connection)
+            sede = repository.obtener_sede_por_id(id_sede)
+            if not sede:
+                return None, f"Sede con ID {id_sede} no encontrada", 404
+            return sede, "Sede obtenida correctamente", 200
+        except Exception as e:
+            return None, f"Error al obtener sede: {str(e)}", 500
+        finally:
+            connection.close()
+
 
 def enviar_notificacion_resumen_diario():
     """

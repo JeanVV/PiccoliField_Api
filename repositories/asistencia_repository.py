@@ -110,6 +110,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 2. ASISTENCIAS RECIENTES ─────────────────────────────────────────────
     def get_recientes(self, limite=10):
         cursor = self.connection.cursor()
@@ -142,6 +143,7 @@ class AsistenciaRepository:
             return cursor.fetchall()
         finally:
             cursor.close()
+
 
     # ── 3. LISTA DE COLABORADORES CON ESTADO Y JUSTIFICACIÓN ─────────────────
     def get_colaboradores(self):
@@ -178,6 +180,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 4. HISTORIAL DE TURNOS DE UN USUARIO ─────────────────────────────────
     def get_historial(self, idUsuario):
         cursor = self.connection.cursor()
@@ -196,6 +199,7 @@ class AsistenciaRepository:
             return cursor.fetchall()
         finally:
             cursor.close()
+
 
     # ── 5. MARCAR ASISTENCIA (INGRESO / SALIDA) ──────────────────────────────
     def marcar_asistencia(self, id_usuario, tipo, latitud=None, longitud=None, direccion=None, sede=None, fecha_hora_disp=None, **kwargs):
@@ -317,6 +321,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 6. REGISTRAR JUSTIFICACIÓN ───────────────────────────────────────────
     def registrar_justificacion(self, id_usuario, motivo, descripcion, fecha, ruta_sustento=None):
         try:
@@ -398,6 +403,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 7. OBTENER ÚLTIMA JUSTIFICACIÓN DE UN USUARIO ────────────────────────
     def get_justificacion_usuario(self, id_usuario):
         cursor = self.connection.cursor()
@@ -424,6 +430,7 @@ class AsistenciaRepository:
             return cursor.fetchone()
         finally:
             cursor.close()
+
 
     def _parse_datetime(self, valor_str):
         if not valor_str:
@@ -484,6 +491,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 9. REVISAR (APROBAR/RECHAZAR) JUSTIFICACIÓN COMO ADMINISTRADOR ───────
     def revisar_justificacion(self, id_usuario=None, id_revisor=1, estado="APROBADA", comentario="", id_asistencias=None, **kwargs):
         id_user = id_usuario if id_usuario is not None else kwargs.get("id_usuario_colaborador")
@@ -541,6 +549,7 @@ class AsistenciaRepository:
         finally:
             cursor.close()
 
+
     # ── 10. CONSULTA RESUMEN DE ASISTENCIAS DEL DÍA (10:30 AM) ───────────────
     def get_resumen_diario(self):
         cursor = self.connection.cursor()
@@ -562,6 +571,7 @@ class AsistenciaRepository:
             return cursor.fetchone()
         finally:
             cursor.close()
+
 
     # ── 11. TOKENS FCM DE ADMINISTRADORES Y SUPERVISORES ─────────────────────
     def get_tokens_administradores_supervisores(self):
@@ -586,3 +596,99 @@ class AsistenciaRepository:
             return cursor.fetchall() or []
         finally:
             cursor.close()
+
+    # ── 12. OBTENER SEDES ────────────────────────────────────────────────────
+    def obtener_sedes(self):
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT idSede, sede, direccion, codHuellero, latitud, longitud, radio_geocerca 
+                FROM SEDES
+                ORDER BY idSede ASC
+            """
+            cursor.execute(sql)
+            rows = cursor.fetchall() or []
+            sedes = []
+            for r in rows:
+                if isinstance(r, dict):
+                    item = dict(r)
+                else:
+                    item = {
+                        "idSede": r[0],
+                        "sede": r[1],
+                        "direccion": r[2],
+                        "codHuellero": r[3],
+                        "latitud": r[4],
+                        "longitud": r[5],
+                        "radio_geocerca": r[6],
+                    }
+                if item.get("latitud") is not None:
+                    try:
+                        item["latitud"] = float(item["latitud"])
+                    except (ValueError, TypeError):
+                        pass
+                if item.get("longitud") is not None:
+                    try:
+                        item["longitud"] = float(item["longitud"])
+                    except (ValueError, TypeError):
+                        pass
+                if item.get("radio_geocerca") is not None:
+                    try:
+                        item["radio_geocerca"] = float(item["radio_geocerca"])
+                    except (ValueError, TypeError):
+                        pass
+                sedes.append(item)
+            return sedes
+        finally:
+            cursor.close()
+
+    def obtener_sede_por_id(self, id_sede):
+        try:
+            cursor = self.connection.cursor(dictionary=True)
+        except TypeError:
+            cursor = self.connection.cursor()
+        try:
+            sql = """
+                SELECT idSede, sede, direccion, codHuellero, latitud, longitud, radio_geocerca 
+                FROM SEDES
+                WHERE idSede = %s
+                LIMIT 1
+            """
+            cursor.execute(sql, (id_sede,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            if isinstance(row, dict):
+                item = dict(row)
+            else:
+                item = {
+                    "idSede": row[0],
+                    "sede": row[1],
+                    "direccion": row[2],
+                    "codHuellero": row[3],
+                    "latitud": row[4],
+                    "longitud": row[5],
+                    "radio_geocerca": row[6],
+                }
+            if item.get("latitud") is not None:
+                try:
+                    item["latitud"] = float(item["latitud"])
+                except (ValueError, TypeError):
+                    pass
+            if item.get("longitud") is not None:
+                try:
+                    item["longitud"] = float(item["longitud"])
+                except (ValueError, TypeError):
+                    pass
+            if item.get("radio_geocerca") is not None:
+                try:
+                    item["radio_geocerca"] = float(item["radio_geocerca"])
+                except (ValueError, TypeError):
+                    pass
+            return item
+        finally:
+            cursor.close()
+

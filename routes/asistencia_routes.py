@@ -210,3 +210,26 @@ def notificar_resumen():
 
     return success_response(data, message, http_code)
 
+
+# ── 9. Listar Sedes de la Empresa ────────────────────────────────────────────
+@asistencia_bp.route("/api/sedes", methods=["GET"])
+@asistencia_bp.route("/sedes", methods=["GET"])
+@jwt_required(optional=True)
+def listar_sedes():
+    data, message, http_code = asistencia_service.obtener_sedes()
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
+# ── 10. Obtener Sede por ID ──────────────────────────────────────────────────
+@asistencia_bp.route("/api/sedes/<int:id>", methods=["GET"])
+@asistencia_bp.route("/sedes/<int:id>", methods=["GET"])
+@jwt_required(optional=True)
+def obtener_sede_por_id(id):
+    data, message, http_code = asistencia_service.obtener_sede_por_id(id)
+    if data is None:
+        return error_response(message, http_code)
+    return success_response(data, message, http_code)
+
+
