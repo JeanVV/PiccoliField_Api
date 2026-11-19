@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "piccolifield-full-api-v2-updated",
     "name": "PiccoliField API - Colección Completa (Actualizada)",
-    "description": "Colección completa y exhaustiva con el 100% de rutas y endpoints de PiccoliField API.\nIncluye Autenticación, Perfil, Notificaciones, Puntos de Venta, Pedidos, Catálogo, Operaciones de Impulsador, Asistencias, Justificaciones, Supervisión, Prospectos, FCM y Archivos Multimedia.",
+    "description": "Colección completa y exhaustiva con el 100% de rutas y endpoints de PiccoliField API.\nIncluye Autenticación, Perfil, Fotos físicas en uploads/, Notificaciones, Puntos de Venta, Pedidos, Catálogo, Operaciones de Impulsador, Asistencias, Justificaciones, Supervisión, Prospectos (con conversión automática a PDV), FCM y Archivos Multimedia.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -21,13 +21,13 @@
       "key": "base_url",
       "value": "https://piccolifield-api-smkc.onrender.com/api",
       "type": "string",
-      "description": "URL base en Render. Para local usar: http://localhost:5000/api"
+      "description": "URL base en Render. Para pruebas en desarrollo local usar: http://localhost:5000/api"
     },
     {
       "key": "base_host",
       "value": "https://piccolifield-api-smkc.onrender.com",
       "type": "string",
-      "description": "Host raíz sin prefijo /api (para uploads y rutas directas)"
+      "description": "Host raíz sin prefijo /api (para uploads y rutas directas). Para local usar: http://localhost:5000"
     },
     {
       "key": "token",
@@ -39,7 +39,7 @@
   "item": [
     {
       "name": "0. Autenticación, Perfil y Notificaciones",
-      "description": "Login, perfil de usuario, tokens FCM, fotos de perfil y notificaciones push.",
+      "description": "Login, perfil de usuario, tokens FCM, fotos de perfil (físicas en uploads/perfiles/) y notificaciones push.",
       "item": [
         {
           "name": "Login (Iniciar Sesión)",
@@ -133,7 +133,7 @@
                 "foto"
               ]
             },
-            "description": "Actualiza la foto de perfil del usuario en sesión (formato Data URL base64 o ruta).",
+            "description": "Actualiza la foto de perfil del usuario en sesión. La API decodifica el Base64, guarda el archivo en uploads/perfiles/ y almacena la ruta corta en MySQL.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"url_foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/...\"\n}",
@@ -142,6 +142,36 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Mi Foto de Perfil (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/perfil/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "foto"
+              ]
+            },
+            "description": "Permite subir la foto de perfil directamente como archivo físico multipart (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Seleccionar archivo de imagen .jpg/.png"
+                }
+              ]
             }
           },
           "response": []
@@ -166,7 +196,7 @@
           "response": []
         },
         {
-          "name": "Actualizar Foto de un Usuario por ID (Admin / Web)",
+          "name": "Actualizar Foto de un Usuario por ID (Admin Base64)",
           "request": {
             "method": "PUT",
             "header": [
@@ -187,7 +217,7 @@
                 "foto"
               ]
             },
-            "description": "Permite al administrador actualizar la foto de perfil de cualquier usuario en la base de datos.",
+            "description": "Permite al administrador actualizar la foto de perfil de cualquier usuario mediante Base64 o ruta.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"url_foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/...\"\n}",
@@ -196,6 +226,37 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de un Usuario por ID (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/usuarios/8/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuarios",
+                "8",
+                "foto"
+              ]
+            },
+            "description": "Permite al administrador subir la imagen física del usuario mediante multipart/form-data (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Seleccionar imagen física"
+                }
+              ]
             }
           },
           "response": []
@@ -221,7 +282,7 @@
           "response": []
         },
         {
-          "name": "Actualizar FCM Token de Mi Perfil (Push)",
+          "name": "Actualizar FCM Token de Mi Perfil (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -255,7 +316,41 @@
           "response": []
         },
         {
-          "name": "Actualizar FCM Token (Ruta /api/usuario/fcm-token)",
+          "name": "Actualizar FCM Token de Mi Perfil (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/perfil/fcm-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "perfil",
+                "fcm-token"
+              ]
+            },
+            "description": "Ruta POST alternativa para registrar o refrescar el token FCM de notificaciones push.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm_token_generado_en_el_dispositivo_movil_firebase_123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar FCM Token (Alias /api/usuario/fcm-token)",
           "request": {
             "method": "POST",
             "header": [
@@ -279,6 +374,40 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"token\": \"fcm_token_generado_en_el_dispositivo_movil_firebase_123456\",\n  \"dispositivo_info\": \"Xiaomi Redmi Note 12\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar FCM Token (Alias PUT /api/usuario/fcm-token)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/usuario/fcm-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "usuario",
+                "fcm-token"
+              ]
+            },
+            "description": "Ruta alias con método PUT para actualizar el token FCM.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"fcm_token_generado_en_el_dispositivo_movil_firebase_123456\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -329,7 +458,7 @@
     },
     {
       "name": "1. Puntos de Venta y Distribución",
-      "description": "Gestión de puntos de venta (tipo VENTA o DISTRIBUCIÓN), asignación de promotores/responsables e historial.",
+      "description": "Gestión de puntos de venta (tipo VENTA o DISTRIBUCIÓN), asignación de promotores/responsables, fotos de fachada e historial.",
       "item": [
         {
           "name": "Listar Puntos de Venta (Con Filtros)",
@@ -369,7 +498,7 @@
           "response": []
         },
         {
-          "name": "Asignar Responsable / Promotor a Punto de Venta (Admin)",
+          "name": "Asignar Responsable / Promotor a Punto de Venta (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -404,6 +533,41 @@
           "response": []
         },
         {
+          "name": "Asignar Responsable / Promotor a Punto de Venta (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/responsable",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "responsable"
+              ]
+            },
+            "description": "Ruta POST alternativa para asignar responsable a un punto de venta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Asignación comercial inicial\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
           "name": "Historial de Asignaciones del Punto de Venta",
           "request": {
             "method": "GET",
@@ -424,7 +588,7 @@
           "response": []
         },
         {
-          "name": "Actualizar Foto de Punto de Venta (Base64 o Multipart)",
+          "name": "Actualizar Foto de Punto de Venta (Base64)",
           "request": {
             "method": "PUT",
             "header": [
@@ -445,7 +609,110 @@
                 "foto"
               ]
             },
-            "description": "Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la base de datos.",
+            "description": "Guarda la fotografía de fachada del punto de venta en uploads/prospectos/pdv_20.jpg y actualiza url_foto en la BD.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de Punto de Venta (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Guarda la foto de fachada enviando un archivo físico en multipart (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Foto de fachada del local"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de PDV (Ruta Supervisión)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Ruta de supervisión para actualizar la foto de fachada del punto de venta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de PDV (Ruta Supervisión POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Ruta de supervisión POST alternativa para actualizar la foto de fachada.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
@@ -475,6 +742,27 @@
               ]
             },
             "description": "Retorna en streaming binario la imagen del punto de venta o del prospecto del que fue convertido."
+          },
+          "response": []
+        },
+        {
+          "name": "Obtener Foto de PDV (Ruta Supervisión Stream)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/20/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "20",
+                "foto"
+              ]
+            },
+            "description": "Retorna en streaming la foto del punto de venta desde el módulo de supervisión."
           },
           "response": []
         }
@@ -565,6 +853,11 @@
             "method": "POST",
             "header": [
               {
+                "key": "X-Operation-Id",
+                "value": "op-pedido-anidado-67890",
+                "type": "text"
+              },
+              {
                 "key": "Content-Type",
                 "value": "application/json",
                 "type": "text"
@@ -581,10 +874,10 @@
                 "pedidos"
               ]
             },
-            "description": "Registra un pedido vinculando el idPuntosVenta desde la URL (ideal para app Android móvil).",
+            "description": "Registra un pedido vinculando el idPuntosVenta directamente en la ruta URL.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idProductos\": 1,\n  \"cantSolicitada\": 3\n}",
+              "raw": "{\n  \"idProductos\": 1,\n  \"cantSolicitada\": 10\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -595,7 +888,7 @@
           "response": []
         },
         {
-          "name": "Listar Pedidos de un Punto Específico",
+          "name": "Listar Pedidos de un Punto de Venta Específico",
           "request": {
             "method": "GET",
             "header": [],
@@ -610,12 +903,12 @@
                 "pedidos"
               ]
             },
-            "description": "Obtiene todos los pedidos asociados al punto de venta especificado en la ruta."
+            "description": "Consulta únicamente el historial de pedidos pertenecientes al punto de venta indicado."
           },
           "response": []
         },
         {
-          "name": "Actualizar Estado del Pedido (Despacho - Admin)",
+          "name": "Actualizar Estado del Pedido (Despacho)",
           "request": {
             "method": "PUT",
             "header": [
@@ -636,7 +929,7 @@
                 "estado"
               ]
             },
-            "description": "Cambia el estado del pedido: REGISTRADO -> EN_PREPARACION -> ENTREGADO (o CANCELADO). Solo para Administrador.",
+            "description": "Actualiza el estado: REGISTRADO -> EN_PREPARACION -> ENTREGADO (o CANCELADO). Al pasar a ENTREGADO descuenta inventario.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"EN_PREPARACION\"\n}",
@@ -650,7 +943,7 @@
           "response": []
         },
         {
-          "name": "Actualizar Estado a ENTREGADO (Despacho)",
+          "name": "Actualizar Estado del Pedido (Método PATCH)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -671,7 +964,7 @@
                 "estado"
               ]
             },
-            "description": "Marca el pedido como ENTREGADO una vez despachado y entregado al punto de distribución.",
+            "description": "Actualización parcial del estado del pedido mediante método PATCH.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"ENTREGADO\"\n}",
@@ -687,44 +980,24 @@
       ]
     },
     {
-      "name": "3. Catálogo de Productos",
-      "description": "Catálogo general de licores y macerados de Piccoli.",
+      "name": "3. Catálogo y Productos",
+      "description": "Consulta de catálogo de licores y bebidas artesanales, búsqueda por código de barras (EAN-13 / UPC).",
       "item": [
         {
-          "name": "Listar Catálogo de Productos Activos",
+          "name": "Listar Productos del Catálogo",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/productos",
+              "raw": "{{base_url}}/productos?activo=1",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
-                "productos"
+                "productos?activo=1"
               ]
             },
-            "description": "Obtiene la lista de productos activos de la empresa con SKU, EAN, precios y categoría."
-          },
-          "response": []
-        },
-        {
-          "name": "Buscar Producto por Código EAN o SKU",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/productos/ean/7751234567890",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "productos",
-                "ean",
-                "7751234567890"
-              ]
-            },
-            "description": "Busca un producto por su código de barras EAN o su código SKU único."
+            "description": "Devuelve todos los productos del catálogo comercial (ID, nombre, descripción, SKU, EAN, precio sugerido, foto)."
           },
           "response": []
         },
@@ -743,15 +1016,35 @@
                 "1"
               ]
             },
-            "description": "Devuelve la ficha técnica completa del producto especificado por su idProductos."
+            "description": "Información detallada de un producto específico del catálogo."
+          },
+          "response": []
+        },
+        {
+          "name": "Buscar Producto por Código de Barras EAN",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/productos/ean/7751234567890",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "productos",
+                "ean",
+                "7751234567890"
+              ]
+            },
+            "description": "Busca un producto por su código EAN-13 o código de barras estándar para visualización y venta rápida."
           },
           "response": []
         }
       ]
     },
     {
-      "name": "4. Impulsador (Operaciones en Campo e Incidencias)",
-      "description": "Dashboard, ventas con lector de barras, reposición de stock, incidencias y catálogo del local asignado.",
+      "name": "4. Operaciones de Impulsador",
+      "description": "Venta rápida por código de barras, reposición de stock (evidencias en uploads/evidencias/), reporte de incidencias y dashboard del promotor.",
       "item": [
         {
           "name": "Dashboard del Impulsador",
@@ -887,7 +1180,7 @@
           "response": []
         },
         {
-          "name": "Reponer Stock de Producto",
+          "name": "Reponer Stock de Producto (Base64)",
           "request": {
             "method": "POST",
             "header": [
@@ -908,15 +1201,71 @@
                 "reponer"
               ]
             },
-            "description": "Actualiza las unidades en exhibición y almacén del producto en el punto de venta.",
+            "description": "Actualiza las unidades en exhibición y almacén del producto. Guarda la foto física en uploads/evidencias/reposicion_...jpg y registra la ruta en MySQL.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idProductos\": 1,\n  \"cantExhibida\": 15,\n  \"cantAlmacen\": 30,\n  \"idPuntosVenta\": 1,\n  \"observacion\": \"Reposición matutina de anaqueles\"\n}",
+              "raw": "{\n  \"idProductos\": 1,\n  \"cantExhibida\": 15,\n  \"cantAlmacen\": 30,\n  \"idPuntosVenta\": 1,\n  \"observacion\": \"Reposición matutina de anaqueles\",\n  \"foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reponer Stock de Producto (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/stock/reponer",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "stock",
+                "reponer"
+              ]
+            },
+            "description": "Permite subir la evidencia física de reposición como archivo multipart (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "idProductos",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "cantExhibida",
+                  "value": "15",
+                  "type": "text"
+                },
+                {
+                  "key": "cantAlmacen",
+                  "value": "30",
+                  "type": "text"
+                },
+                {
+                  "key": "idPuntosVenta",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "observacion",
+                  "value": "Góndola reabastecida al 100%",
+                  "type": "text"
+                },
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Foto de anaquel reabastecido"
+                }
+              ]
             }
           },
           "response": []
@@ -977,7 +1326,7 @@
           "response": []
         },
         {
-          "name": "Reportar Incidencia en Local",
+          "name": "Reportar Incidencia en Local (Base64)",
           "request": {
             "method": "POST",
             "header": [
@@ -997,7 +1346,7 @@
                 "incidencias"
               ]
             },
-            "description": "Registra una incidencia detectada en el punto de venta con nivel de severidad y sustento.",
+            "description": "Registra una incidencia detectada en el punto de venta. Guarda la evidencia en uploads/evidencias/incidencia_...jpg y la ruta en EVIDENCIAS.ruta_archivo.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tipo\": \"ROTURA\",\n  \"descripcion\": \"Se quebró una botella de licor de cacao en el pasillo central\",\n  \"severidad\": \"MEDIA\",\n  \"idPuntosVenta\": 1,\n  \"foto\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
@@ -1006,6 +1355,56 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reportar Incidencia en Local (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/impulsador/incidencias",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "impulsador",
+                "incidencias"
+              ]
+            },
+            "description": "Reporta una incidencia enviando la fotografía física directamente como archivo multipart.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "tipo",
+                  "value": "ROTURA",
+                  "type": "text"
+                },
+                {
+                  "key": "descripcion",
+                  "value": "Botella rota por caída accidental",
+                  "type": "text"
+                },
+                {
+                  "key": "severidad",
+                  "value": "ALTA",
+                  "type": "text"
+                },
+                {
+                  "key": "idPuntosVenta",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Foto de la incidencia"
+                }
+              ]
             }
           },
           "response": []
@@ -1074,7 +1473,7 @@
     },
     {
       "name": "5. Asistencias y Justificaciones",
-      "description": "Marcación de asistencias (Ingreso/Salida), justificaciones, revisión y disparo de resumen diario (10:30 AM).",
+      "description": "Marcación de asistencias (Ingreso/Salida), justificaciones con foto física en uploads/justificaciones/, revisión y disparo de resumen diario (10:30 AM).",
       "item": [
         {
           "name": "Resumen General de Asistencias del Día",
@@ -1171,6 +1570,25 @@
           "response": []
         },
         {
+          "name": "Última Asistencia (Ruta raíz /asistencias/ultima)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/asistencias/ultima?idUsuario=8",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "asistencias",
+                "ultima?idUsuario=8"
+              ]
+            },
+            "description": "Ruta directa de compatibilidad para consultar la última asistencia del usuario."
+          },
+          "response": []
+        },
+        {
           "name": "Historial de Asistencias por Colaborador",
           "request": {
             "method": "GET",
@@ -1187,6 +1605,25 @@
               ]
             },
             "description": "Histórico detallado de todas las marcas de asistencia del colaborador indicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asistencias (Ruta raíz /historial/:id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/historial/8",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "historial",
+                "8"
+              ]
+            },
+            "description": "Ruta directa de compatibilidad para consultar el historial de un colaborador."
           },
           "response": []
         },
@@ -1258,7 +1695,7 @@
           "response": []
         },
         {
-          "name": "Registrar Justificación de Inasistencia / Tardanza",
+          "name": "Registrar Justificación (Base64)",
           "request": {
             "method": "POST",
             "header": [
@@ -1278,7 +1715,7 @@
                 "justificar"
               ]
             },
-            "description": "Envía una justificación de falta o tardanza con motivo, descripción y foto de sustento médica/laboral.",
+            "description": "Envía justificación de falta o tardanza. Guarda la imagen en uploads/justificaciones/justif_{idUsuario}_{ts}.jpg y la ruta en JUSTIFICACIONES.ruta_sustento.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"SALUD\",\n  \"descripcion\": \"Cita médica por descanso de 24 horas\",\n  \"fecha\": \"2026-11-19\",\n  \"fotoSustentoBase64\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
@@ -1287,6 +1724,56 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Justificación (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/justificar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "justificar"
+              ]
+            },
+            "description": "Permite adjuntar el archivo físico de sustento médico mediante multipart/form-data (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "idUsuario",
+                  "value": "8",
+                  "type": "text"
+                },
+                {
+                  "key": "motivo",
+                  "value": "SALUD",
+                  "type": "text"
+                },
+                {
+                  "key": "descripcion",
+                  "value": "Descanso médico emitido por ESSALUD",
+                  "type": "text"
+                },
+                {
+                  "key": "fecha",
+                  "value": "2026-11-19",
+                  "type": "text"
+                },
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Certificado o receta médica física"
+                }
+              ]
             }
           },
           "response": []
@@ -1345,6 +1832,25 @@
           "response": []
         },
         {
+          "name": "Ver Justificaciones (Ruta raíz /justificacion/:id)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/justificacion/8",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "justificacion",
+                "8"
+              ]
+            },
+            "description": "Ruta directa alternativa para consultar justificaciones de un usuario."
+          },
+          "response": []
+        },
+        {
           "name": "Revisar Justificación (Aprobar / Rechazar)",
           "request": {
             "method": "POST",
@@ -1380,7 +1886,26 @@
           "response": []
         },
         {
-          "name": "Disparar Notificación de Resumen Diario (10:30 AM / Manual)",
+          "name": "Revisar Justificación (Ruta raíz /justificacion/revisar)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/justificacion/revisar",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "justificacion",
+                "revisar"
+              ]
+            },
+            "description": "Ruta directa alternativa para revisar y validar justificaciones."
+          },
+          "response": []
+        },
+        {
+          "name": "Disparar Notificación de Resumen Diario (POST /api/asistencias/notificar-resumen)",
           "request": {
             "method": "POST",
             "header": [],
@@ -1395,6 +1920,70 @@
               ]
             },
             "description": "Ejecuta manualmente el resumen diario de asistencias y envía las notificaciones push a los Administradores y Supervisores.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Disparar Notificación de Resumen Diario (GET /api/asistencias/notificar-resumen)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/asistencias/notificar-resumen",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "asistencias",
+                "notificar-resumen"
+              ]
+            },
+            "description": "Permite invocar el resumen de asistencias mediante método GET para tareas automatizadas tipo cron web.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Disparar Notificación de Resumen (Ruta raíz POST /notificar-resumen)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/notificar-resumen",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "notificar-resumen"
+              ]
+            },
+            "description": "Ruta raíz directa para ejecutar el resumen de asistencias diario.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Disparar Notificación de Resumen (Ruta raíz GET /notificar-resumen)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/notificar-resumen",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": [
+                "notificar-resumen"
+              ]
+            },
+            "description": "Ruta raíz directa GET alternativa para webhook o cron job.",
             "auth": {
               "type": "noauth"
             }
@@ -1446,7 +2035,7 @@
           "response": []
         },
         {
-          "name": "Detalle de Vendedor por ID",
+          "name": "Detalle de Vendedor",
           "request": {
             "method": "GET",
             "header": [],
@@ -1461,7 +2050,7 @@
                 "8"
               ]
             },
-            "description": "Ficha completa del vendedor, local actual asignado y resumen de rendimiento."
+            "description": "Perfil comercial completo del vendedor: histórico de ventas, puntos asignados y efectividad."
           },
           "response": []
         },
@@ -1482,7 +2071,49 @@
                 "historial-asignaciones"
               ]
             },
-            "description": "Locales y puntos de venta donde ha sido asignado el colaborador históricamente."
+            "description": "Locales y rutas que ha tenido asignados el vendedor a lo largo del tiempo."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asignaciones (Alias /personal/:id/historial-asignaciones)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/personal/8/historial-asignaciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "personal",
+                "8",
+                "historial-asignaciones"
+              ]
+            },
+            "description": "Ruta alias para consultar historial de asignaciones de personal."
+          },
+          "response": []
+        },
+        {
+          "name": "Historial de Asignaciones (Alias /impulsadores/:id/historial-asignaciones)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/historial-asignaciones",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "historial-asignaciones"
+              ]
+            },
+            "description": "Ruta alias para consultar historial de asignaciones de impulsadores."
           },
           "response": []
         },
@@ -1492,7 +2123,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/supervision/vendedores/8/rendimiento-historico?anio=2026",
+              "raw": "{{base_url}}/supervision/vendedores/8/rendimiento-historico",
               "host": [
                 "{{base_url}}"
               ],
@@ -1500,15 +2131,93 @@
                 "supervision",
                 "vendedores",
                 "8",
-                "rendimiento-historico?anio=2026"
+                "rendimiento-historico"
               ]
             },
-            "description": "Ventas mensuales acumuladas a lo largo del año para análisis de desempeño."
+            "description": "Gráfico y métricas de desempeño histórico de ventas del colaborador."
           },
           "response": []
         },
         {
-          "name": "Reasignar Vendedor a Punto de Venta",
+          "name": "Rendimiento Histórico (Alias /personal/:id/rendimiento-historico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/personal/8/rendimiento-historico",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "personal",
+                "8",
+                "rendimiento-historico"
+              ]
+            },
+            "description": "Ruta alias para consultar rendimiento histórico de personal."
+          },
+          "response": []
+        },
+        {
+          "name": "Rendimiento Histórico (Alias /impulsadores/:id/rendimiento-historico)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/rendimiento-historico",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "rendimiento-historico"
+              ]
+            },
+            "description": "Ruta alias para consultar rendimiento histórico de impulsadores."
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Vendedor a Punto de Venta (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/vendedores/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "vendedores",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Cambia el punto de venta donde opera el vendedor y registra el motivo en la auditoría.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Relevo por incremento de demanda de fin de semana\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Vendedor (PUT /supervision/vendedores/:id/reasignar)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1530,10 +2239,10 @@
                 "reasignar"
               ]
             },
-            "description": "Cambia el local asignado de un vendedor e inserta registro en HISTORIAL_ASIGNACIONES.",
+            "description": "Método PUT alternativo para reasignar vendedor a otro local.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Refuerzo comercial por campaña navideña\"\n}",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Reasignación de zona\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1544,47 +2253,7 @@
           "response": []
         },
         {
-          "name": "Listar Todos los Impulsadores",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/supervision/impulsadores",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "supervision",
-                "impulsadores"
-              ]
-            },
-            "description": "Lista de impulsadores con sus locales asignados y estado actual."
-          },
-          "response": []
-        },
-        {
-          "name": "Foto de Impulsador",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/supervision/impulsadores/8/foto",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "supervision",
-                "impulsadores",
-                "8",
-                "foto"
-              ]
-            },
-            "description": "Devuelve la foto del impulsador para visualización en el panel de supervisión."
-          },
-          "response": []
-        },
-        {
-          "name": "Reasignar Personal (Ruta Genérica /personal/:id/reasignar)",
+          "name": "Reasignar Personal (Alias POST /personal/:id/reasignar)",
           "request": {
             "method": "POST",
             "header": [
@@ -1606,10 +2275,10 @@
                 "reasignar"
               ]
             },
-            "description": "Ruta unificada para reasignar cualquier tipo de personal de campo a un nuevo punto de venta.",
+            "description": "Ruta alias para reasignar personal de campo.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idPuntosVenta\": 3,\n  \"motivo\": \"Reubicación estratégica de zona\"\n}",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Reasignación operativa\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1620,7 +2289,115 @@
           "response": []
         },
         {
-          "name": "Reasignar Impulsador (Ruta Directa por Body)",
+          "name": "Reasignar Personal (Alias PUT /personal/:id/reasignar)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/personal/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "personal",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Ruta alias PUT para reasignar personal.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Rotación periódica\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador (Alias POST /impulsadores/:id/reasignar)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Ruta alias POST para reasignar impulsadores.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Cobertura especial\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador (Alias PUT /impulsadores/:id/reasignar)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "reasignar"
+              ]
+            },
+            "description": "Ruta alias PUT para reasignar impulsadores.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"motivo\": \"Rotación comercial\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador (Ruta Global /reasignar-impulsador)",
           "request": {
             "method": "POST",
             "header": [
@@ -1640,10 +2417,10 @@
                 "reasignar-impulsador"
               ]
             },
-            "description": "Reasignación enviando tanto el idPuntosVenta como el idUsuario en el cuerpo JSON.",
+            "description": "Endpoint centralizado para cambiar de local a cualquier impulsador.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idPuntosVenta\": 2,\n  \"idUsuario\": 8,\n  \"motivo\": \"Rotación programada de personal\"\n}",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"idPuntosVenta\": 3,\n  \"motivo\": \"Cobertura en Plaza Norte\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1654,21 +2431,61 @@
           "response": []
         },
         {
-          "name": "Listar Puntos de Venta (Supervisión)",
+          "name": "Listar Impulsadores (Supervisión)",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/supervision/puntos-venta?estado=ACTIVO",
+              "raw": "{{base_url}}/supervision/impulsadores",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "supervision",
-                "puntos-venta?estado=ACTIVO"
+                "impulsadores"
               ]
             },
-            "description": "Lista todos los locales comerciales con su impulsador asignado, stock y estado."
+            "description": "Lista todo el personal de campo registrado para supervisión operativa."
+          },
+          "response": []
+        },
+        {
+          "name": "Foto de Impulsador",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/impulsadores/8/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "impulsadores",
+                "8",
+                "foto"
+              ]
+            },
+            "description": "Obtiene la foto de perfil del impulsador indicado."
+          },
+          "response": []
+        },
+        {
+          "name": "Listar Puntos de Venta (Supervisión)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta"
+              ]
+            },
+            "description": "Lista todos los puntos de venta con métricas de ventas y cobertura de impulsadores."
           },
           "response": []
         },
@@ -1688,7 +2505,49 @@
                 "1"
               ]
             },
-            "description": "Ficha completa del punto de venta con dirección, coordenadas y responsable."
+            "description": "Ficha completa del punto de venta con estado, responsable y coordenadas."
+          },
+          "response": []
+        },
+        {
+          "name": "Stock de Productos en Punto de Venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/stock",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "stock"
+              ]
+            },
+            "description": "Consulta el inventario actual de botellas en exhibición y almacén del punto de venta."
+          },
+          "response": []
+        },
+        {
+          "name": "Stock de Productos (Alias /productos)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/productos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "productos"
+              ]
+            },
+            "description": "Ruta alternativa para obtener el inventario de productos del punto de venta."
           },
           "response": []
         },
@@ -1709,12 +2568,48 @@
                 "historial"
               ]
             },
-            "description": "Lista de todos los colaboradores que han estado a cargo del punto de venta."
+            "description": "Historial de colaboradores que han estado destacados en este local comercial."
           },
           "response": []
         },
         {
-          "name": "Reasignar Impulsador desde el Punto de Venta",
+          "name": "Reasignar Impulsador desde Punto de Venta (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/puntos-venta/1/reasignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "puntos-venta",
+                "1",
+                "reasignar"
+              ]
+            },
+            "description": "Asigna un nuevo impulsador al punto de venta indicado.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Cobertura del turno tarde\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reasignar Impulsador desde PDV (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1736,10 +2631,10 @@
                 "reasignar"
               ]
             },
-            "description": "Asigna un nuevo impulsador al punto de venta especificado en la URL.",
+            "description": "Método PUT para reasignar impulsador a un punto de venta.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Cubrir descanso médico del titular\"\n}",
+              "raw": "{\n  \"idUsuario\": 8,\n  \"motivo\": \"Relevo semanal\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1750,42 +2645,21 @@
           "response": []
         },
         {
-          "name": "Stock de Productos en Punto de Venta",
+          "name": "Listar Alertas de Stock Pendientes",
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/supervision/puntos-venta/1/stock",
+              "raw": "{{base_url}}/supervision/alertas?estado=PENDIENTE",
               "host": [
                 "{{base_url}}"
               ],
               "path": [
                 "supervision",
-                "puntos-venta",
-                "1",
-                "stock"
+                "alertas?estado=PENDIENTE"
               ]
             },
-            "description": "Stock actual en góndola y almacén de todos los productos en el local seleccionado."
-          },
-          "response": []
-        },
-        {
-          "name": "Listar Alertas de Stock",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/supervision/alertas",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "supervision",
-                "alertas"
-              ]
-            },
-            "description": "Lista alertas generadas cuando el stock cae por debajo del nivel mínimo (PENDIENTE / ATENDIDA / IGNORADA)."
+            "description": "Lista las alertas por quiebre de stock o producto crítico en anaqueles."
           },
           "response": []
         },
@@ -1810,7 +2684,7 @@
           "response": []
         },
         {
-          "name": "Cambiar Estado de Alerta (Atender / Ignorar)",
+          "name": "Cambiar Estado de Alerta (PATCH)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -1846,7 +2720,79 @@
           "response": []
         },
         {
-          "name": "Marcar Alerta como Atendida",
+          "name": "Cambiar Estado de Alerta (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Método PUT para cambiar el estado de la alerta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ATENDIDA\",\n  \"comentario\": \"Stock repuesto en tienda\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Cambiar Estado de Alerta (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Método POST para cambiar el estado de la alerta.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"ATENDIDA\",\n  \"comentario\": \"Alerta atendida satisfactoriamente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Alerta como Atendida (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1882,7 +2828,43 @@
           "response": []
         },
         {
-          "name": "Marcar Alerta como Ignorada",
+          "name": "Marcar Alerta como Atendida (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/atender",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "atender"
+              ]
+            },
+            "description": "Método POST alternativo para marcar la alerta como atendida.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Mercadería recibida en góndola\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Alerta como Ignorada (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1908,6 +2890,42 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"comentario\": \"Local en inventario general\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Marcar Alerta como Ignorada (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/alertas/1/ignorar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "alertas",
+                "1",
+                "ignorar"
+              ]
+            },
+            "description": "Método POST alternativo para ignorar una alerta de stock.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"comentario\": \"Producto descontinuado temporalmente\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -1957,7 +2975,7 @@
           "response": []
         },
         {
-          "name": "Atender / Resolver Incidencia",
+          "name": "Atender / Resolver Incidencia (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -1983,6 +3001,42 @@
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"RESUELTO\",\n  \"comentario\": \"Se coordinó con el área logística la reposición del material dañado\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Atender / Resolver Incidencia (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/supervision/incidencias/1/atender",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "supervision",
+                "incidencias",
+                "1",
+                "atender"
+              ]
+            },
+            "description": "Método POST alternativo para resolver una incidencia.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"RESUELTO\",\n  \"comentario\": \"Incidencia atendida en local\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -2038,7 +3092,7 @@
     },
     {
       "name": "7. Prospectos (Puntos Potenciales)",
-      "description": "Registro de clientes potenciales, pipeline de negociación, conversión automática a Punto de Venta (Distribución) y seguimientos.",
+      "description": "Registro de clientes potenciales, fotos de fachada (físicas en uploads/evidencias/ y uploads/prospectos/), pipeline de negociación, conversión automática a Punto de Venta (Distribución) y seguimientos.",
       "item": [
         {
           "name": "Listar Prospectos (Con Filtros)",
@@ -2078,7 +3132,7 @@
           "response": []
         },
         {
-          "name": "Registrar Nuevo Prospecto",
+          "name": "Registrar Nuevo Prospecto (JSON con Base64 / Ruta)",
           "request": {
             "method": "POST",
             "header": [
@@ -2097,7 +3151,7 @@
                 "prospectos"
               ]
             },
-            "description": "Registra un nuevo prospecto comercial en la base de datos.",
+            "description": "Registra un prospecto. Si envía foto_fachada o url_foto en Base64, el servidor la guarda en uploads/evidencias/ y registra la ruta corta en MySQL.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"nombre_comercial\": \"Licorería El Parral\",\n  \"tipo_local\": \"Licorería\",\n  \"direccion\": \"Av. Bolognesi 450\",\n  \"contacto\": \"Juan Pérez\",\n  \"telefono\": \"978123456\",\n  \"potencial\": \"ALTO\",\n  \"estado\": \"NUEVO\",\n  \"latitud\": -6.7725,\n  \"longitud\": -79.8402,\n  \"idDistrito\": 1,\n  \"notas\": \"Interesado en cócteles de crema para temporada de verano\",\n  \"url_foto\": \"uploads/prospectos/prospecto_parral.jpg\"\n}",
@@ -2106,6 +3160,90 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Registrar Nuevo Prospecto (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos"
+              ]
+            },
+            "description": "Permite registrar el prospecto adjuntando directamente el archivo físico de fachada (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "nombre_comercial",
+                  "value": "Bodega Santa Rosa",
+                  "type": "text"
+                },
+                {
+                  "key": "tipo_local",
+                  "value": "Bodega",
+                  "type": "text"
+                },
+                {
+                  "key": "direccion",
+                  "value": "Calle Dos de Mayo 1291",
+                  "type": "text"
+                },
+                {
+                  "key": "contacto",
+                  "value": "Alfonso Llontop",
+                  "type": "text"
+                },
+                {
+                  "key": "telefono",
+                  "value": "999792030",
+                  "type": "text"
+                },
+                {
+                  "key": "potencial",
+                  "value": "MEDIO",
+                  "type": "text"
+                },
+                {
+                  "key": "estado",
+                  "value": "NUEVO",
+                  "type": "text"
+                },
+                {
+                  "key": "latitud",
+                  "value": "-6.771234",
+                  "type": "text"
+                },
+                {
+                  "key": "longitud",
+                  "value": "-79.839876",
+                  "type": "text"
+                },
+                {
+                  "key": "idDistrito",
+                  "value": "1",
+                  "type": "text"
+                },
+                {
+                  "key": "notas",
+                  "value": "Cliente con buen flujo peatonal",
+                  "type": "text"
+                },
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Fotografía de fachada del local"
+                }
+              ]
             }
           },
           "response": []
@@ -2145,7 +3283,7 @@
           "response": []
         },
         {
-          "name": "Cambiar Estado de Prospecto (Al CONVERTIR -> Crea Punto de Venta)",
+          "name": "Cambiar Estado de Prospecto (Al CONVERTIR -> Crea Punto de Venta en BD)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2180,7 +3318,42 @@
           "response": []
         },
         {
-          "name": "Descartar Prospecto (Con Motivo)",
+          "name": "Cambiar Estado a EN_NEGOCIACION",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/estado",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "estado"
+              ]
+            },
+            "description": "Pasa el estado a EN_NEGOCIACION cuando se inician tratos formales.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"EN_NEGOCIACION\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Descartar Prospecto (Con Motivo de Descarte)",
           "request": {
             "method": "PATCH",
             "header": [
@@ -2201,7 +3374,7 @@
                 "estado"
               ]
             },
-            "description": "Pasa el estado a DESCARTADO especificando el motivo del descarte.",
+            "description": "Pasa el estado a DESCARTADO especificando el motivo del descarte en MySQL.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"estado\": \"DESCARTADO\",\n  \"motivo_descarte\": \"Volumen de compra muy bajo para venta mayorista\"\n}",
@@ -2215,7 +3388,7 @@
           "response": []
         },
         {
-          "name": "Asignar Promotor a Prospecto",
+          "name": "Asignar Promotor a Prospecto (PUT)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2237,6 +3410,41 @@
               ]
             },
             "description": "Asigna el promotor responsable de cerrar la negociación con el prospecto.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idUsuario\": 8\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Asignar Promotor a Prospecto (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/asignar",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "asignar"
+              ]
+            },
+            "description": "Ruta POST alternativa para asignar promotor comercial a un prospecto.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"idUsuario\": 8\n}",
@@ -2305,7 +3513,7 @@
           "response": []
         },
         {
-          "name": "Actualizar Foto de Prospecto (Base64 o Multipart)",
+          "name": "Actualizar Foto de Prospecto (Base64)",
           "request": {
             "method": "PUT",
             "header": [
@@ -2326,7 +3534,7 @@
                 "foto"
               ]
             },
-            "description": "Guarda la fotografía de fachada del prospecto en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la base de datos.",
+            "description": "Guarda la fotografía física en uploads/prospectos/prospecto_1.jpg y actualiza url_foto en la BD.",
             "body": {
               "mode": "raw",
               "raw": "{\n  \"foto_fachada\": \"data:image/jpeg;base64,/9j/4AAQSkZJRg...\"\n}",
@@ -2335,6 +3543,37 @@
                   "language": "json"
                 }
               }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Actualizar Foto de Prospecto (Multipart Form-Data)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/prospectos/1/foto",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "prospectos",
+                "1",
+                "foto"
+              ]
+            },
+            "description": "Sube la fotografía física de fachada de un prospecto existente en multipart/form-data (campo 'foto').",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "foto",
+                  "type": "file",
+                  "src": "",
+                  "description": "Archivo de imagen de fachada"
+                }
+              ]
             }
           },
           "response": []
@@ -2355,7 +3594,7 @@
                 "foto"
               ]
             },
-            "description": "Retorna en streaming binario la imagen registrada del prospecto."
+            "description": "Retorna en streaming binario la imagen física registrada del prospecto."
           },
           "response": []
         }
@@ -2402,10 +3641,29 @@
     },
     {
       "name": "9. Archivos y Multimedia (Uploads)",
-      "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas.",
+      "description": "Rutas estáticas para descargar y servir fotos de perfil, evidencias e imágenes subidas en el servidor.",
       "item": [
         {
-          "name": "Servir Archivo / Foto Subida (Prefijo /api/uploads)",
+          "name": "Estado del Servidor API (Ruta Raíz /)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_host}}/",
+              "host": [
+                "{{base_host}}"
+              ],
+              "path": []
+            },
+            "description": "Verifica la disponibilidad del servidor Flask y estado de la API REST.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Servir Foto de Prospecto (Prefijo /api/uploads)",
           "request": {
             "method": "GET",
             "header": [],
@@ -2428,7 +3686,7 @@
           "response": []
         },
         {
-          "name": "Servir Archivo / Foto Subida (Ruta Raíz /uploads)",
+          "name": "Servir Foto de Perfil (Ruta Raíz /uploads)",
           "request": {
             "method": "GET",
             "header": [],
@@ -2444,6 +3702,75 @@
               ]
             },
             "description": "Sirve directamente el archivo físico alojado en la carpeta uploads/ desde la raíz del dominio.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Servir Evidencia de Incidencia o Reposición",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/uploads/evidencias/incidencia_8_1700000000.jpg",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "evidencias",
+                "incidencia_8_1700000000.jpg"
+              ]
+            },
+            "description": "Descarga la foto de evidencia física guardada para incidencias o reposición de stock.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Servir Sustento de Justificación",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/uploads/justificaciones/justif_8_1700000000.jpg",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "justificaciones",
+                "justif_8_1700000000.jpg"
+              ]
+            },
+            "description": "Descarga la foto del certificado médico o justificación laboral.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Servir Foto de Punto de Venta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/uploads/prospectos/pdv_20.jpg",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "uploads",
+                "prospectos",
+                "pdv_20.jpg"
+              ]
+            },
+            "description": "Descarga la foto de fachada del punto de venta.",
             "auth": {
               "type": "noauth"
             }
